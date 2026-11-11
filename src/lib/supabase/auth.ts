@@ -1,0 +1,83 @@
+import type { User } from "@/types";
+import type { Role } from "@/types";
+import { getSupabase } from "./client";
+
+const ROLES: Role[] = ["resident", "staff", "vendor", "admin"];
+
+interface ProfileRow {
+  id: string;
+  full_name: string;
+  phone: string;
+  room_number: string;
+  role: string;
+  student_id: string;
+  avatar_url: string | null;
+}
+
+function mapProfile(row: ProfileRow): User {
+  const role = ROLES.includes(row.role as Role) ? (row.role as Role) : "resident";
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    phone: row.phone,
+    roomNumber: row.room_number,
+    role,
+    studentId: row.student_id,
+    avatarUrl: row.avatar_url ?? undefined,
+  };
+}
+
+export async function signInWithPassword(
+  email: string,
+  password: string
+): Promise<User> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase chưa được cấu hình");
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error) throw error;
+
+  const { data: profile, error: profileError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", data.user.id)
+    .single();
+
+  if (profileError || !profile) {
+    throw profileError ?? new Error("Không tìm thấy hồ sơ người dùng");
+  }
+  return mapProfile(profile as ProfileRow);
+}
+
+export async function signUpWithProfile(
+  email: string,
+  password: string,
+  meta: { fullName: string; phone: string; roomNumber: string; studentId: string }
+): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase chưa được cấu hình");
+
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: meta.fullName,
+        phone: meta.phone,
+        room_number: meta.roomNumber,
+        student_id: meta.studentId,
+        role: "resident",
+      },
+    },
+  });
+  if (error) throw error;
+}
+
+export async function signOutSupabase(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  await supabase.auth.signOut();
+}
