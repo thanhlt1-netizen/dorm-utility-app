@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import Link from "next/link";
 import {
   Check,
   ChefHat,
@@ -10,6 +11,7 @@ import {
   Plus,
   Search,
   Trash2,
+  UserRound,
   UtensilsCrossed,
 } from "lucide-react";
 import { StatusBadge } from "@/components/animated/status-badge";
@@ -104,6 +106,15 @@ export default function VendorKitchenPage() {
       <ScreenHeader
         title="Nhà bếp"
         subtitle={`Thực đơn ${tomorrowISO().slice(8, 10)}/${tomorrowISO().slice(5, 7)} · ${activeOrders.length} đơn đang xử lý`}
+        right={
+          <Link
+            href="/profile"
+            className="flex size-10 items-center justify-center rounded-full hover:bg-muted"
+            aria-label="Cá nhân"
+          >
+            <UserRound className="size-5" />
+          </Link>
+        }
       />
 
       <div className="sticky top-[57px] z-30 bg-background/80 px-4 py-3 backdrop-blur-xl">
