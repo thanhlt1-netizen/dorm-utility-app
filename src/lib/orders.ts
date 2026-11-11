@@ -113,6 +113,16 @@ export async function createWaterOrder(input: {
   };
 }
 
+export async function confirmWaterPaymentSelf(code: string): Promise<Order> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc("confirm_water_payment_self", {
+    p_code: code,
+  });
+  if (error) throw error;
+
+  return mapOrderRow(data as OrderRow);
+}
+
 export async function createFoodOrder(input: {
   items: { menuId: string; dishName: string; price: number; quantity: number }[];
   totalAmount: number;
