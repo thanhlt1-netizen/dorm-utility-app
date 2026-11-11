@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ScreenHeader } from "@/components/shared/screen-header";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useOrders } from "@/hooks/use-orders";
 import { cn, formatDayLabel, formatVND } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
@@ -23,6 +24,7 @@ const filters: { value: OrderType | "all"; label: string }[] = [
 export default function OrdersPage() {
   const currentUser = useAuthStore((s) => s.currentUser);
   const { orders, hydrated } = useOrdersStore();
+  useOrders();
   const [filter, setFilter] = useState<OrderType | "all">("all");
 
   const myOrders = orders.filter((o) => o.userId === currentUser.id);
