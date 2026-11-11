@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Droplets, HardHat, Loader2, User } from "lucide-react";
+import Link from "next/link";
+import { Check, Droplets, HardHat, Loader2, User, UserRound } from "lucide-react";
 import { StatusBadge } from "@/components/animated/status-badge";
 import { TapButton } from "@/components/animated/tap-button";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -102,6 +103,15 @@ export default function StaffDashboardPage() {
       <ScreenHeader
         title="Trực ca · Đổi nước"
         subtitle={`${visible.length} yêu cầu đang chờ xử lý`}
+        right={
+          <Link
+            href="/profile"
+            className="flex size-10 items-center justify-center rounded-full hover:bg-muted"
+            aria-label="Cá nhân"
+          >
+            <UserRound className="size-5" />
+          </Link>
+        }
       />
 
       <div className="sticky top-[57px] z-30 bg-background/80 px-4 py-3 backdrop-blur-xl">
