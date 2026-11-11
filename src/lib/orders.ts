@@ -113,9 +113,9 @@ export async function createWaterOrder(input: {
   };
 }
 
-export async function confirmWaterPaymentSelf(code: string): Promise<Order> {
+export async function confirmPaymentSelf(code: string): Promise<Order> {
   const supabase = requireSupabase();
-  const { data, error } = await supabase.rpc("confirm_water_payment_self", {
+  const { data, error } = await supabase.rpc("confirm_payment_self", {
     p_code: code,
   });
   if (error) throw error;
