@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Banknote,
   Clock,
   Droplets,
   Loader2,
@@ -27,8 +28,15 @@ import {
   buildTransferContent,
   buildVietQRUrl,
 } from "@/lib/payment";
-import { confirmPaymentSelf } from "@/lib/orders";
-import { cn, formatDayLabel, formatTime, formatVND, sleep } from "@/lib/utils";
+import { confirmPaymentSelf, setOrderPaymentMethod } from "@/lib/orders";
+import {
+  cn,
+  formatDayLabel,
+  formatTime,
+  formatVND,
+  sleep,
+} from "@/lib/utils";
+import type { PaymentMethod } from "@/types";
 import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
 
@@ -42,11 +50,14 @@ export default function OrderDetailPage() {
 
   const [showPay, setShowPay] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const [phase, setPhase] = useState<"idle" | "success">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
   const order = orders.find((o) => o.id === params.id);
   const unpaid = !!order && order.paymentStatus === "unpaid";
+  const currentMethod: PaymentMethod = order?.paymentMethod ?? "cash";
 
   useEffect(() => {
     if (!showPay || !order || order.paymentStatus !== "paid") return;
@@ -74,6 +85,24 @@ export default function OrderDetailPage() {
       setError(e instanceof Error ? e.message : "Xác nhận thanh toán thất bại.");
     } finally {
       setConfirming(false);
+    }
+  }
+
+  async function handleSwitchMethod(method: PaymentMethod) {
+    if (switching || !order || method === currentMethod) return;
+    setSwitching(true);
+    setSwitchError(null);
+
+    try {
+      const updated = await setOrderPaymentMethod(order.code, method);
+      updateOrder(order.id, { paymentMethod: updated.paymentMethod ?? method });
+      if (method === "bank_transfer") setShowPay(true);
+    } catch (e) {
+      setSwitchError(
+        e instanceof Error ? e.message : "Đổi hình thức thanh toán thất bại."
+      );
+    } finally {
+      setSwitching(false);
     }
   }
 
@@ -166,13 +195,81 @@ export default function OrderDetailPage() {
                 <p className="text-sm font-semibold">Đơn chưa được thanh toán</p>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {cassoEnabled
-                  ? "Chuyển khoản theo QR bên dưới — hệ thống tự xác nhận khi tiền về."
-                  : "Chuyển khoản theo QR rồi bấm xác nhận để ghi nhận thanh toán."}
+                {order.type === "water"
+                  ? "Đổi hình thức thanh toán hoặc chuyển khoản ngay — đơn đang chờ tiếp nhận."
+                  : cassoEnabled
+                    ? "Chuyển khoản theo QR bên dưới — hệ thống tự xác nhận khi tiền về."
+                    : "Chuyển khoản theo QR rồi bấm xác nhận để ghi nhận thanh toán."}
               </p>
+
+              {order.type === "water" && (
+                <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-2xl bg-muted/60 p-1">
+                  {(
+                    [
+                      { value: "cash", label: "Tiền mặt", icon: Banknote },
+                      {
+                        value: "bank_transfer",
+                        label: "Chuyển khoản",
+                        icon: QrCode,
+                      },
+                    ] as const
+                  ).map((m) => {
+                    const active = currentMethod === m.value;
+                    return (
+                      <button
+                        key={m.value}
+                        onClick={() => handleSwitchMethod(m.value)}
+                        disabled={switching}
+                        className="relative min-h-10 rounded-xl px-3 text-xs font-semibold"
+                      >
+                        {active && (
+                          <motion.span
+                            layoutId="order-pay-method"
+                            transition={{
+                              type: "spring",
+                              stiffness: 420,
+                              damping: 32,
+                            }}
+                            className="absolute inset-0 rounded-xl bg-background shadow-sm"
+                          />
+                        )}
+                        <span
+                          className={cn(
+                            "relative flex items-center justify-center gap-1.5 transition-colors",
+                            active ? "text-foreground" : "text-muted-foreground"
+                          )}
+                        >
+                          <m.icon className="size-3.5" />
+                          {m.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {order.type === "water" && currentMethod === "cash" && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Bạn sẽ trả tiền mặt trực tiếp cho người giao nước.
+                </p>
+              )}
+
+              {switchError && (
+                <p className="mt-2 text-xs font-medium text-red-500">
+                  {switchError}
+                </p>
+              )}
+
               <TapButton
                 onClick={() => {
                   setError(null);
+                  if (
+                    order.type === "water" &&
+                    currentMethod === "cash"
+                  ) {
+                    handleSwitchMethod("bank_transfer");
+                    return;
+                  }
                   setShowPay(true);
                 }}
                 className="mt-3 w-full bg-amber-600 shadow-amber-600/30"
