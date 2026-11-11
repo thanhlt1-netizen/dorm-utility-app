@@ -2,7 +2,7 @@
 
 Web app mobile-first (PWA) cho sinh viên ký túc xá với 2 dịch vụ:
 
-- **Đổi nước 20L** — sinh viên tạo yêu cầu, ban quản lý/sinh viên trực ca nhận và giao.
+- **Đổi nước 20L** — sinh viên tạo yêu cầu, ban quản lý/sinh viên trực ca nhận và giao; thanh toán tiền mặt khi nhận nước hoặc chuyển khoản QR (tự xác nhận qua Casso).
 - **Đặt cơm trưa** — đặt chiều nay, nhận trưa mai; thanh toán VietQR, lấy đồ tại điểm tụ bằng mã 6 số.
 
 App chạy **production thật**: mọi dữ liệu ghi/đọc trực tiếp Supabase (PostgreSQL + RLS + RPC), không còn dữ liệu mẫu.
@@ -57,7 +57,7 @@ Chưa cấu hình env? App hiển thị màn hình **Setup** kèm hướng dẫn
 Mặc định trang đặt cơm dùng VietQR + xác nhận thủ công. Khi cấu hình VNPay, sinh viên sẽ thanh toán qua cổng VNPay bằng QR ngân hàng bất kỳ và hệ thống **tự động xác nhận** qua IPN.
 
 1. Đăng ký merchant sandbox tại [sandbox.vnpayment.vn/devreg](https://sandbox.vnpayment.vn/devreg/) để nhận `vnp_TmnCode` + `vnp_HashSecret` (miễn phí, production cần hợp đồng với VNPay).
-2. Chạy thêm [`supabase/migration-002-vnpay.sql`](supabase/migration-002-vnpay.sql) trong SQL Editor (RPC `create_food_order_unpaid` tạo đơn giữ suất ở trạng thái chưa thanh toán).
+2. Chạy thêm [`supabase/migration-002-vnpay.sql`](supabase/migration-002-vnpay.sql) (RPC `create_food_order_unpaid`) và [`supabase/migration-003-water-qr.sql`](supabase/migration-003-water-qr.sql) (RPC `confirm_water_payment_self` — xác nhận chuyển khoản đơn nước khi chưa nối Casso) trong SQL Editor.
 3. Lấy `service_role` key ở Supabase → **Settings → API**.
 4. Thêm env vars vào `.env.local` và Vercel:
 
@@ -77,7 +77,7 @@ Luồng: tạo đơn `unpaid` (giữ suất) → redirect sang VNPay → sinh vi
 
 ## Tự xác nhận VietQR qua Casso (tuỳ chọn)
 
-Không cần VNPay merchant vẫn có xác nhận **realtime**: kết nối tài khoản ngân hàng nhà bếp với [Casso](https://casso.vn) — khi sinh viên chuyển khoản đúng nội dung `KTX <phòng> <mã đơn>`, Casso gọi webhook và đơn tự chuyển `paid`.
+Không cần VNPay merchant vẫn có xác nhận **realtime**: kết nối tài khoản ngân hàng nhà bếp với [Casso](https://casso.vn) — khi sinh viên chuyển khoản đúng nội dung `KTX <phòng> <mã đơn>`, Casso gọi webhook và đơn tự chuyển `paid` (áp dụng cho cả đơn nước lẫn đơn cơm).
 
 1. Đăng ký [app.casso.vn](https://app.casso.vn), kết nối tài khoản ngân hàng nhận tiền.
 2. Tạo **Webhook** với URL `https://<domain>/api/payment/casso/webhook`, copy **Secure Token**.
@@ -121,7 +121,8 @@ src/
 
 - [x] Mobile layout + Bottom Navigation
 - [x] Trang đăng nhập 4 vai trò (sinh viên tự đăng kí, staff/vendor/admin tài khoản cố định)
-- [x] Home + flow Đổi nước
+- [x] Home + flow Đổi nước (tiền mặt hoặc chuyển khoản QR)
+- [x] Casso webhook tự xác nhận VietQR realtime cho cả đơn nước + cơm
 - [x] Flow Đặt cơm + VietQR
 - [x] Lịch sử đơn + chi tiết đơn với Timeline trạng thái
 - [x] Staff dashboard + Vendor kitchen
