@@ -1,0 +1,18 @@
+{
+  "name": "Dorm Utility — Tiện ích Ký túc xá",
+  "short_name": "Dorm Utility",
+  "description": "Đổi bình nước 20L và đặt cơm trưa trước 1 ngày cho sinh viên ký túc xá.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0284c7",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
