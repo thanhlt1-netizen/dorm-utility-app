@@ -1,63 +1,37 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { User } from "@/types";
-import { seedUsers } from "@/lib/mock-data";
 
-export interface MockAccount {
-  email: string;
-  password: string;
-  user: User;
-}
-
-type AuthMode = "mock" | "supabase";
+export const GUEST_USER: User = {
+  id: "",
+  fullName: "",
+  phone: "",
+  roomNumber: "",
+  role: "resident",
+  studentId: "",
+};
 
 interface AuthState {
   currentUser: User;
   isAuthenticated: boolean;
-  authMode: AuthMode;
-  email: string | null;
-  mockAccounts: MockAccount[];
   hydrated: boolean;
   markHydrated: () => void;
-  signInSession: (user: User, mode: AuthMode, email: string) => void;
-  addMockAccount: (account: MockAccount) => void;
+  setSession: (user: User | null) => void;
   signOut: () => void;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      currentUser: seedUsers[0],
-      isAuthenticated: false,
-      authMode: "mock",
-      email: null,
-      mockAccounts: [],
-      hydrated: false,
-      markHydrated: () => set({ hydrated: true }),
-      signInSession: (user, mode, email) =>
-        set({ currentUser: user, isAuthenticated: true, authMode: mode, email }),
-      addMockAccount: (account) =>
-        set((s) => ({ mockAccounts: [...s.mockAccounts, account] })),
-      signOut: () =>
-        set({
-          currentUser: seedUsers[0],
-          isAuthenticated: false,
-          authMode: "mock",
-          email: null,
-        }),
+export const useAuthStore = create<AuthState>((set) => ({
+  currentUser: GUEST_USER,
+  isAuthenticated: false,
+  hydrated: false,
+  markHydrated: () => set({ hydrated: true }),
+  setSession: (user) =>
+    set({
+      currentUser: user ?? GUEST_USER,
+      isAuthenticated: Boolean(user),
+      hydrated: true,
     }),
-    {
-      name: "dorm-auth",
-      skipHydration: true,
-      partialize: (state) => ({
-        currentUser: state.currentUser,
-        isAuthenticated: state.isAuthenticated,
-        authMode: state.authMode,
-        email: state.email,
-        mockAccounts: state.mockAccounts,
-      }),
-    }
-  )
-);
+  signOut: () =>
+    set({ currentUser: GUEST_USER, isAuthenticated: false, hydrated: true }),
+}));
