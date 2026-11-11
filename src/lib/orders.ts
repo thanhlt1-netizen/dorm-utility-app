@@ -1,5 +1,10 @@
 import { getSupabase } from "@/lib/supabase/client";
-import type { Order, OrderStatus, PaymentStatus } from "@/types";
+import type {
+  Order,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from "@/types";
 
 interface WaterDetailRow {
   bottle_count: number;
@@ -27,6 +32,7 @@ interface OrderRow {
   room_number: string;
   total_amount: number;
   payment_status: string;
+  payment_method: string | null;
   pickup_code: string | null;
   note: string | null;
   created_at: string;
@@ -54,6 +60,7 @@ function mapOrderRow(row: OrderRow): Order {
     status: row.status as OrderStatus,
     totalAmount: row.total_amount,
     paymentStatus: row.payment_status as PaymentStatus,
+    paymentMethod: (row.payment_method as PaymentMethod | null) ?? undefined,
     pickupCode: row.pickup_code ?? undefined,
     note: row.note ?? undefined,
     createdAt: row.created_at,
@@ -117,6 +124,20 @@ export async function confirmPaymentSelf(code: string): Promise<Order> {
   const supabase = requireSupabase();
   const { data, error } = await supabase.rpc("confirm_payment_self", {
     p_code: code,
+  });
+  if (error) throw error;
+
+  return mapOrderRow(data as OrderRow);
+}
+
+export async function setOrderPaymentMethod(
+  code: string,
+  method: PaymentMethod
+): Promise<Order> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc("set_order_payment_method", {
+    p_code: code,
+    p_method: method,
   });
   if (error) throw error;
 
