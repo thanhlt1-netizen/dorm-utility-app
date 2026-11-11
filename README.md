@@ -25,6 +25,24 @@ Mở `http://localhost:3000`, bật Device Toolbar (F12 → mobile) để xem đ
 
 Build production: `pnpm build && pnpm start`.
 
+## Đăng nhập theo vai trò
+
+App yêu cầu đăng nhập qua trang `/login` với 4 vai trò:
+
+- **Sinh viên** — tự đăng ký (họ tên, phòng, MSSV, email, mật khẩu) rồi đăng nhập.
+- **Ban quản lý / Nhà bếp / Quản lý KTX** — đăng nhập bằng tài khoản do admin cấp.
+
+Khi **chưa kết nối Supabase**, app chạy chế độ demo với tài khoản dùng thử (mật khẩu chung `ktx123456`):
+
+| Vai trò | Email |
+| --- | --- |
+| Sinh viên | `sinhvien@dorm.vn` |
+| Ban quản lý | `staff@dorm.vn` |
+| Nhà bếp | `bep@dorm.vn` |
+| Quản lý KTX | `admin@dorm.vn` |
+
+Đã kết nối Supabase: sinh viên đăng ký bằng form (role luôn là `resident` ở server), còn tài khoản staff/vendor/admin được tạo trước trong **Authentication → Users** rồi nâng role trong bảng `users`.
+
 ## Kết nối Supabase (tuỳ chọn)
 
 App chạy đầy đủ với dữ liệu mẫu khi chưa cấu hình. Để chuyển sang production:
@@ -41,28 +59,29 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 
 5. Trên Vercel: thêm cùng 2 biến vào **Settings → Environment Variables** rồi redeploy.
 
-Sau khi cấu hình: đăng nhập bằng email/password tại trang **Cá nhân**, đơn hàng cập nhật realtime qua channel `orders-realtime`.
+Sau khi cấu hình: đăng nhập bằng email/password tại trang **/login**, đơn hàng cập nhật realtime qua channel `orders-realtime`.
 
 ## Cấu trúc
 
 ```
 src/
 ├── app/
-│   ├── (resident)/        # Home, water, food, orders (+ orders/[id] chi tiết), profile
-│   ├── (staff)/dashboard  # Trực ca đổi nước
-│   ├── (vendor)/kitchen   # Nhà bếp: đơn hàng + thực đơn
+│   ├── (auth)/login        # Đăng nhập / đăng ký 4 vai trò
+│   ├── (resident)/         # Home, water, food, orders (+ orders/[id] chi tiết), profile
+│   ├── (staff)/dashboard   # Trực ca đổi nước
+│   ├── (vendor)/kitchen    # Nhà bếp: đơn hàng + thực đơn
 │   └── api/webhook/payment
 ├── components/{ui,shared,animated}
-├── lib/{supabase,payment.ts,utils.ts,orders.ts,mock-data.ts}
-├── hooks/                 # use-theme, use-realtime-orders
-├── stores/                # auth, orders, menus (Zustand)
+├── lib/{supabase,payment.ts,utils.ts,orders.ts,mock-data.ts,demo-accounts.ts}
+├── hooks/                  # use-theme, use-realtime-orders
+├── stores/                 # auth, orders, menus (Zustand)
 └── types/
 ```
 
 ## Roadmap
 
 - [x] Mobile layout + Bottom Navigation
-- [x] Mock auth + floating Role switcher
+- [x] Trang đăng nhập 4 vai trò (sinh viên tự đăng ký, staff/vendor/admin tài khoản cố định)
 - [x] Home + flow Đổi nước
 - [x] Flow Đặt cơm + VietQR giả lập
 - [x] Lịch sử đơn + chi tiết đơn với Timeline trạng thái
