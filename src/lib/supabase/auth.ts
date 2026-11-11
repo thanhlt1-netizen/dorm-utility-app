@@ -83,6 +83,35 @@ export async function signUpWithProfile(
   return { needsEmailConfirmation: false, user };
 }
 
+export async function verifySignupOtp(
+  email: string,
+  token: string
+): Promise<User> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase chưa được cấu hình");
+
+  const { data, error } = await supabase.auth.verifyOtp({
+    email,
+    token,
+    type: "signup",
+  });
+  if (error) throw error;
+  if (!data.user) throw new Error("Mã OTP không hợp lệ.");
+
+  return fetchProfile(data.user.id);
+}
+
+export async function resendSignupOtp(email: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase chưa được cấu hình");
+
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+  });
+  if (error) throw error;
+}
+
 export async function fetchProfile(userId: string): Promise<User> {
   const supabase = getSupabase();
   if (!supabase) throw new Error("Supabase chưa được cấu hình");
