@@ -15,7 +15,7 @@ import { SuccessOverlay } from "@/components/animated/success-overlay";
 import { TapButton } from "@/components/animated/tap-button";
 import { ScreenHeader } from "@/components/shared/screen-header";
 import { Card } from "@/components/ui/card";
-import { seedMenus } from "@/lib/mock-data";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   BANK_INFO,
   buildTransferContent,
@@ -29,6 +29,7 @@ import {
   tomorrowISO,
 } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { useMenusStore } from "@/stores/menus-store";
 import { useOrdersStore } from "@/stores/orders-store";
 import type { DailyMenu, Order } from "@/types";
 
@@ -39,9 +40,14 @@ export default function FoodPage() {
   const currentUser = useAuthStore((s) => s.currentUser);
   const addOrder = useOrdersStore((s) => s.addOrder);
 
+  const { menus: allMenus, hydrated: menusHydrated } = useMenusStore();
+
   const menus = useMemo(
-    () => seedMenus.filter((m) => m.isActive && m.remaining > 0),
-    []
+    () =>
+      allMenus.filter(
+        (m) => m.date === tomorrowISO() && m.isActive && m.remaining > 0
+      ),
+    [allMenus]
   );
 
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -122,7 +128,12 @@ export default function FoodPage() {
       />
 
       <div className="flex-1 space-y-4 px-4 py-5 pb-28">
-        {menus.length === 0 ? (
+        {!menusHydrated ? (
+          <>
+            <Skeleton className="h-44 w-full rounded-3xl" />
+            <Skeleton className="h-44 w-full rounded-3xl" />
+          </>
+        ) : menus.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <UtensilsCrossed className="size-10 text-muted-foreground" />
             <p className="font-medium">Chưa có thực đơn ngày mai</p>
