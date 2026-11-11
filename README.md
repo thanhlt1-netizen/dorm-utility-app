@@ -75,6 +75,21 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
 Luồng: tạo đơn `unpaid` (giữ suất) → redirect sang VNPay → sinh viên quét QR → VNPay gọi IPN (ký HMAC-SHA512, đối chiếu số tiền) → đơn chuyển `paid` + realtime cập nhật. Đơn không thanh toán trong 15 phút có thể huỷ thủ công bởi vendor/admin.
 
+## Tự xác nhận VietQR qua Casso (tuỳ chọn)
+
+Không cần VNPay merchant vẫn có xác nhận **realtime**: kết nối tài khoản ngân hàng nhà bếp với [Casso](https://casso.vn) — khi sinh viên chuyển khoản đúng nội dung `KTX <phòng> <mã đơn>`, Casso gọi webhook và đơn tự chuyển `paid`.
+
+1. Đăng ký [app.casso.vn](https://app.casso.vn), kết nối tài khoản ngân hàng nhận tiền.
+2. Tạo **Webhook** với URL `https://<domain>/api/payment/casso/webhook`, copy **Secure Token**.
+3. Thêm env vars vào `.env.local` và Vercel:
+
+```
+NEXT_PUBLIC_CASSO_ENABLED=true
+CASSO_SECURE_TOKEN=xxxx
+```
+
+Luồng: bấm "Tạo lệnh thanh toán" → đơn `unpaid` giữ suất + QR kèm mã đơn → sinh viên chuyển khoản → Casso webhook (verify token, đối chiếu mã đơn + số tiền) → đơn `paid` + realtime cập nhật. Chưa bật Casso/VNPay thì dùng xác nhận thủ công như cũ.
+
 ## Đăng nhập theo vai trò
 
 Trang `/login` có 4 tab vai trò:
