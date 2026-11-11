@@ -21,17 +21,12 @@ import {
   buildTransferContent,
   buildVietQRUrl,
 } from "@/lib/payment";
-import {
-  formatVND,
-  generateOrderCode,
-  generatePickupCode,
-  sleep,
-  tomorrowISO,
-} from "@/lib/utils";
+import { useMenus } from "@/hooks/use-menus";
+import { createFoodOrder } from "@/lib/orders";
+import { formatVND, sleep, tomorrowISO } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
-import { useMenusStore } from "@/stores/menus-store";
 import { useOrdersStore } from "@/stores/orders-store";
-import type { DailyMenu, Order } from "@/types";
+import type { DailyMenu } from "@/types";
 
 type Phase = "idle" | "loading" | "success";
 
@@ -40,7 +35,7 @@ export default function FoodPage() {
   const currentUser = useAuthStore((s) => s.currentUser);
   const addOrder = useOrdersStore((s) => s.addOrder);
 
-  const { menus: allMenus, hydrated: menusHydrated } = useMenusStore();
+  const { data: allMenus = [], isLoading: menusLoading } = useMenus();
 
   const menus = useMemo(
     () =>
@@ -54,6 +49,7 @@ export default function FoodPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [pickupCode, setPickupCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const selectedItems = menus
     .map((m) => ({ menu: m, qty: quantities[m.id] || 0 }))
@@ -81,43 +77,28 @@ export default function FoodPage() {
   async function handleConfirmPayment() {
     if (phase !== "idle" || selectedItems.length === 0) return;
     setPhase("loading");
+    setError(null);
 
-    const code = generateOrderCode("food");
-    const pickup = generatePickupCode();
-    const now = new Date().toISOString();
-
-    const order: Order = {
-      id: `o-${Date.now()}`,
-      code,
-      userId: currentUser.id,
-      userName: currentUser.fullName,
-      roomNumber: currentUser.roomNumber,
-      type: "food",
-      status: "confirmed",
-      totalAmount,
-      paymentStatus: "paid",
-      pickupCode: pickup,
-      createdAt: now,
-      updatedAt: now,
-      foodDetails: {
-        dishes: selectedItems.map((x) => ({
-          dishId: x.menu.id,
+    try {
+      const order = await createFoodOrder({
+        items: selectedItems.map((x) => ({
+          menuId: x.menu.id,
           dishName: x.menu.dishName,
           price: x.menu.price,
           quantity: x.qty,
         })),
-        pickupDate: tomorrowISO(),
-        pickupTimeSlot: "11:30 - 12:30",
-      },
-    };
-
-    addOrder(order);
-    setPickupCode(pickup);
-    await sleep(1600);
-    setPhase("success");
-    await sleep(2200);
-    setShowPayment(false);
-    router.push("/orders");
+        totalAmount,
+      });
+      addOrder(order);
+      setPickupCode(order.pickupCode ?? "");
+      setPhase("success");
+      await sleep(2200);
+      setShowPayment(false);
+      router.push("/orders");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Đặt cơm thất bại.");
+      setPhase("idle");
+    }
   }
 
   return (
@@ -128,7 +109,7 @@ export default function FoodPage() {
       />
 
       <div className="flex-1 space-y-4 px-4 py-5 pb-28">
-        {!menusHydrated ? (
+        {!menusLoading ? (
           <>
             <Skeleton className="h-44 w-full rounded-3xl" />
             <Skeleton className="h-44 w-full rounded-3xl" />
@@ -307,8 +288,18 @@ export default function FoodPage() {
                 </div>
               </div>
 
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="mt-2 text-center text-xs font-medium text-red-500"
+                >
+                  {error}
+                </motion.p>
+              )}
+
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                Sau khi chuyển khoản, bấm xác nhận bên dưới (mô phỏng webhook).
+                Sau khi chuyển khoản, bấm xác nhận bên dưới để ghi đơn vào hệ thống.
               </p>
 
               <div className="mt-4">
