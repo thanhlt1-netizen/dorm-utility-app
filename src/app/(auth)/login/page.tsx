@@ -167,9 +167,13 @@ export default function LoginPage() {
     if (busy) return;
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !password) {
-      fail("Nhập đầy đủ email và mật khẩu.");
+      fail("Nhập đầy đủ tài khoản và mật khẩu.");
       return;
     }
+    const account =
+      role === "resident" || trimmedEmail.includes("@")
+        ? trimmedEmail
+        : `${trimmedEmail}@ktx.vn`;
 
     setBusy(true);
     resetFormState();
@@ -195,7 +199,7 @@ export default function LoginPage() {
         return;
       }
 
-      const user = await signInWithPassword(trimmedEmail, password);
+      const user = await signInWithPassword(account, password);
       finish(user);
     } catch (e) {
       fail(e instanceof Error ? e.message : "Đăng nhập thất bại.");
@@ -512,9 +516,10 @@ export default function LoginPage() {
               <Input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                type="email"
-                autoComplete="email"
+                placeholder={isResident ? "Email" : "Tài khoản (vd: nv1)"}
+                type={isResident ? "email" : "text"}
+                autoCapitalize="none"
+                autoComplete="username"
               />
               <Input
                 value={password}
@@ -560,7 +565,7 @@ export default function LoginPage() {
       <p className="mt-5 text-center text-[11px] leading-relaxed text-muted-foreground">
         {isResident
           ? "Sinh viên tự đăng kí tài khoản và đăng nhập."
-          : `Tài khoản ${ROLE_LABEL[role].toLowerCase()} do admin cấp sẵn.`}
+          : "Tài khoản do admin cấp · đăng nhập bằng tên (vd: nv1) hoặc email đầy đủ."}
       </p>
     </div>
   );
