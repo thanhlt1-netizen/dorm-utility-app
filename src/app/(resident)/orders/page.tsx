@@ -23,7 +23,7 @@ const filters: { value: OrderType | "all"; label: string }[] = [
 ];
 
 const VNPAY_FAIL_REASONS: Record<string, string> = {
-  "24": "Bạn đã huỷ thanh toán tại cổng VNPay.",
+  "24": "Bạn đã hủy thanh toán tại cổng VNPay.",
   "11": "Đã hết thời gian chờ thanh toán.",
   "51": "Tài khoản không đủ số dư.",
   invalid_signature: "Chữ ký không hợp lệ.",
@@ -223,6 +223,13 @@ function OrderCard({ order }: { order: import("@/types").Order }) {
         </div>
         <StatusBadge status={order.status} />
       </div>
+      {order.paymentStatus === "unpaid" && (
+        <div className="mt-3 rounded-2xl bg-amber-500/10 px-3 py-2">
+          <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+            Chưa thanh toán — chuyển khoản theo lệnh đã tạo để tự động xác nhận
+          </span>
+        </div>
+      )}
       {order.pickupCode && order.status !== "completed" && (
         <div className="mt-3 flex items-center justify-between rounded-2xl bg-muted/60 px-3 py-2">
           <span className="text-xs text-muted-foreground">Mã lấy đồ</span>
