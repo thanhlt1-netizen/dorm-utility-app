@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ClipboardList, Droplets, Package, UtensilsCrossed } from "lucide-react";
 import { StatusBadge } from "@/components/animated/status-badge";
@@ -97,9 +98,13 @@ export default function OrdersPage() {
 }
 
 function OrderCard({ order }: { order: import("@/types").Order }) {
+  const router = useRouter();
   const Icon = order.type === "water" ? Droplets : order.type === "food" ? UtensilsCrossed : Package;
   return (
-    <Card className="p-4">
+    <Card
+      onClick={() => router.push(`/orders/${order.id}`)}
+      className="cursor-pointer p-4 transition-shadow active:shadow-md"
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div
@@ -129,6 +134,9 @@ function OrderCard({ order }: { order: import("@/types").Order }) {
           </span>
         </div>
       )}
+      <p className="mt-2.5 text-center text-[11px] font-medium text-muted-foreground/70">
+        Bấm để xem tiến trình đơn
+      </p>
     </Card>
   );
 }
