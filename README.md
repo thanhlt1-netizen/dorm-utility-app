@@ -32,7 +32,7 @@ Build production: `pnpm build && pnpm start`.
 
 1. Tạo project tại [supabase.com](https://supabase.com).
 2. Mở **SQL Editor**, dán và chạy toàn bộ [`supabase/schema.sql`](supabase/schema.sql) — tạo 5 bảng (`users`, `orders`, `water_order_details`, `daily_menus`, `food_order_details`), enums, trigger `updated_at`, trigger tự tạo profile khi signup, 3 RPC (`create_water_order`, `create_food_order`, `complete_pickup`), RLS policies, realtime publication và seed thực đơn ngày mai.
-3. **Authentication → Providers**: bật Email. Muốn sinh viên đăng ký vào dùng ngay thì tắt "Confirm email".
+3. **Authentication → Providers**: bật Email. Giữ "Confirm email" và đổi template **Confirm Signup** (Authentication → Emails) dùng `{{ .Token }}` thay cho `{{ .ConfirmationURL }}` — sinh viên sẽ nhận **mã OTP 6 số** và nhập trực tiếp trong app (hoặc tắt "Confirm email" để vào dùng luôn).
 4. Tạo tài khoản **staff / vendor / admin** trong **Authentication → Users** (app tự tạo row `users` qua trigger với role mặc định `resident`), rồi nâng quyền trong SQL Editor:
 
 ```sql
@@ -94,7 +94,7 @@ Luồng: bấm "Tạo lệnh thanh toán" → đơn `unpaid` giữ suất + QR k
 
 Trang `/login` có 4 tab vai trò:
 
-- **Sinh viên** — tự đăng kí (họ tên, phòng, MSSV, email, mật khẩu) rồi đăng nhập; role luôn cố định `resident` ở server.
+- **Sinh viên** — tự đăng kí (họ tên, phòng, MSSV, email, mật khẩu) → nhập **mã OTP 6 số** gửi qua email để kích hoạt và vào app luôn; role luôn cố định `resident` ở server.
 - **Ban quản lý / Nhà bếp / Quản lý KTX** — đăng nhập bằng tài khoản admin cấp sẵn; quyền lấy từ bảng `users`, không thể tự nâng.
 
 Đơn hàng cập nhật realtime qua channel `orders-realtime`; tạo đơn nước/cơm và xác nhận mã lấy đồ đi qua RPC `security definer` để chống gian lận (trừ kho nguyên tử, kiểm tra quyền ở server).
@@ -128,6 +128,7 @@ src/
 - [x] Vendor chỉnh thực đơn thật (thêm món, bật/tắt, chỉnh số suất)
 - [x] Supabase schema + RLS + Auth + Realtime + RPC production
 - [x] Thanh toán VNPay QR tự động xác nhận (sandbox/production)
+- [x] Xác thực đăng kí bằng mã OTP 6 số qua email
 - [ ] Confetti + toast system
 - [ ] Service Worker offline đầy đủ
 - [ ] Admin console (thống kê)
