@@ -76,6 +76,33 @@ export async function signUpWithProfile(
   if (error) throw error;
 }
 
+export async function fetchProfile(userId: string): Promise<User> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase chưa được cấu hình");
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", userId)
+    .single();
+
+  if (error || !data) {
+    throw error ?? new Error("Không tìm thấy hồ sơ người dùng");
+  }
+  return mapProfile(data as ProfileRow);
+}
+
+export async function initAuth(): Promise<User | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const { data } = await supabase.auth.getSession();
+  const sessionUser = data.session?.user;
+  if (!sessionUser) return null;
+
+  return fetchProfile(sessionUser.id);
+}
+
 export async function signOutSupabase(): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
