@@ -20,19 +20,25 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { cn, formatTime, formatVND, sleep, tomorrowISO } from "@/lib/utils";
+import { useMenus } from "@/hooks/use-menus";
+import { useOrders } from "@/hooks/use-orders";
+import { createMenu, deleteMenu, updateMenuFields } from "@/lib/menus";
+import { completePickupByCode, markFoodReady } from "@/lib/orders";
+import { cn, formatTime, formatVND, tomorrowISO } from "@/lib/utils";
 import { useMenusStore } from "@/stores/menus-store";
 import { useOrdersStore } from "@/stores/orders-store";
-import type { Order } from "@/types";
+import type { DailyMenu, Order } from "@/types";
 
 type Tab = "orders" | "menu";
 
 export default function VendorKitchenPage() {
   const { orders, updateOrder } = useOrdersStore();
+  useOrders();
   const [tab, setTab] = useState<Tab>("orders");
   const [codeInput, setCodeInput] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const foodOrders = useMemo(
     () =>
@@ -52,36 +58,45 @@ export default function VendorKitchenPage() {
   async function markReady(order: Order) {
     if (busyId) return;
     setBusyId(order.id);
-    await sleep(500);
+    setActionError(null);
     updateOrder(order.id, {
       status: "ready",
       updatedAt: new Date().toISOString(),
     });
-    setBusyId(null);
+    try {
+      await markFoodReady(order.id);
+    } catch (e) {
+      updateOrder(order.id, { status: order.status, updatedAt: order.updatedAt });
+      setActionError(e instanceof Error ? e.message : "Cập nhật thất bại.");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function verifyPickup() {
     const code = codeInput.trim();
-    if (!code) return;
+    if (!code || busyId) return;
 
-    const found = foodOrders.find(
-      (o) => o.pickupCode === code && o.status !== "completed"
-    );
-
-    if (!found) {
-      setVerifyMsg("Không tìm thấy mã hoặc đơn đã hoàn thành.");
-      return;
+    setBusyId("verify");
+    setVerifyMsg(null);
+    setActionError(null);
+    try {
+      const order = await completePickupByCode(code);
+      updateOrder(order.id, {
+        status: order.status,
+        updatedAt: order.updatedAt,
+      });
+      setCodeInput("");
+      setVerifyMsg(
+        `Đã xác nhận lấy đồ · ${order.code} · Phòng ${order.roomNumber}`
+      );
+    } catch (e) {
+      setActionError(
+        e instanceof Error ? e.message : "Không tìm thấy mã hoặc đơn đã hoàn thành."
+      );
+    } finally {
+      setBusyId(null);
     }
-
-    setBusyId(found.id);
-    await sleep(700);
-    updateOrder(found.id, {
-      status: "completed",
-      updatedAt: new Date().toISOString(),
-    });
-    setBusyId(null);
-    setCodeInput("");
-    setVerifyMsg(`Đã xác nhận lấy đồ · ${found.code} · Phòng ${found.roomNumber}`);
   }
 
   return (
@@ -161,6 +176,11 @@ export default function VendorKitchenPage() {
               {verifyMsg && (
                 <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">
                   {verifyMsg}
+                </p>
+              )}
+              {actionError && (
+                <p className="mt-2 text-xs font-medium text-red-500">
+                  {actionError}
                 </p>
               )}
             </Card>
@@ -254,37 +274,70 @@ export default function VendorKitchenPage() {
 
 function MenuEditor() {
   const { menus, hydrated, addMenu, updateMenu, removeMenu } = useMenusStore();
+  useMenus();
   const [showForm, setShowForm] = useState(false);
   const [dishName, setDishName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [maxQuantity, setMaxQuantity] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [editorError, setEditorError] = useState<string | null>(null);
 
   const tomorrowMenus = menus.filter((m) => m.date === tomorrowISO());
 
-  function handleAdd() {
+  async function handleAdd() {
     const name = dishName.trim();
     const parsedPrice = Number(price);
     const parsedQty = Number(maxQuantity);
-    if (!name || !parsedPrice || !parsedQty || parsedQty < 1) return;
+    if (!name || !parsedPrice || !parsedQty || parsedQty < 1 || busy) return;
 
-    addMenu({
-      id: `d-${Date.now()}`,
-      date: tomorrowISO(),
-      dishName: name,
-      description: description.trim(),
-      price: parsedPrice,
-      imageUrl: "",
-      maxQuantity: parsedQty,
-      remaining: parsedQty,
-      isActive: true,
-      nutritionTags: [],
-    });
-    setDishName("");
-    setDescription("");
-    setPrice("");
-    setMaxQuantity("");
-    setShowForm(false);
+    setBusy(true);
+    setEditorError(null);
+    try {
+      const menu = await createMenu({
+        date: tomorrowISO(),
+        dishName: name,
+        description: description.trim(),
+        price: parsedPrice,
+        maxQuantity: parsedQty,
+      });
+      addMenu(menu);
+      setDishName("");
+      setDescription("");
+      setPrice("");
+      setMaxQuantity("");
+      setShowForm(false);
+    } catch (e) {
+      setEditorError(e instanceof Error ? e.message : "Thêm món thất bại.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleUpdate(
+    menu: DailyMenu,
+    patch: { remaining?: number; isActive?: boolean }
+  ) {
+    updateMenu(menu.id, patch);
+    try {
+      await updateMenuFields(menu.id, patch);
+    } catch (e) {
+      updateMenu(menu.id, {
+        remaining: menu.remaining,
+        isActive: menu.isActive,
+      });
+      setEditorError(e instanceof Error ? e.message : "Cập nhật thất bại.");
+    }
+  }
+
+  async function handleRemove(menu: DailyMenu) {
+    removeMenu(menu.id);
+    try {
+      await deleteMenu(menu.id);
+    } catch (e) {
+      addMenu(menu);
+      setEditorError(e instanceof Error ? e.message : "Xóa món thất bại.");
+    }
   }
 
   if (!hydrated) {
@@ -353,11 +406,19 @@ function MenuEditor() {
               </div>
               <TapButton
                 onClick={handleAdd}
-                disabled={!dishName.trim() || !Number(price) || !Number(maxQuantity)}
+                disabled={
+                  busy ||
+                  !dishName.trim() ||
+                  !Number(price) ||
+                  !Number(maxQuantity)
+                }
                 className="w-full bg-emerald-600 text-sm shadow-emerald-600/25"
               >
-                Thêm vào thực đơn mai
+                {busy ? <Loader2 className="size-4 animate-spin" /> : "Thêm vào thực đơn mai"}
               </TapButton>
+              {editorError && (
+                <p className="text-xs font-medium text-red-500">{editorError}</p>
+              )}
             </Card>
           </motion.div>
         )}
@@ -400,7 +461,7 @@ function MenuEditor() {
                     <motion.button
                       whileTap={{ scale: 0.85 }}
                       onClick={() =>
-                        updateMenu(menu.id, {
+                        handleUpdate(menu, {
                           remaining: Math.max(0, menu.remaining - 1),
                         })
                       }
@@ -424,7 +485,7 @@ function MenuEditor() {
                     <motion.button
                       whileTap={{ scale: 0.85 }}
                       onClick={() =>
-                        updateMenu(menu.id, {
+                        handleUpdate(menu, {
                           remaining: Math.min(
                             menu.maxQuantity,
                             menu.remaining + 1
@@ -442,7 +503,7 @@ function MenuEditor() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() =>
-                        updateMenu(menu.id, { isActive: !menu.isActive })
+                        handleUpdate(menu, { isActive: !menu.isActive })
                       }
                       className={cn(
                         "relative h-6 w-11 rounded-full transition-colors",
@@ -467,7 +528,7 @@ function MenuEditor() {
                     </button>
                     <motion.button
                       whileTap={{ scale: 0.85 }}
-                      onClick={() => removeMenu(menu.id)}
+                      onClick={() => handleRemove(menu)}
                       className="flex size-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-500/10"
                       aria-label="Xoá món"
                     >
