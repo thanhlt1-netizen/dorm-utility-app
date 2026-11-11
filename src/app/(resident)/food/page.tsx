@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -23,21 +23,23 @@ import {
   buildVietQRUrl,
 } from "@/lib/payment";
 import { useMenus } from "@/hooks/use-menus";
-import { createFoodOrder } from "@/lib/orders";
+import { createFoodOrder, createFoodOrderUnpaid } from "@/lib/orders";
 import { getSupabase } from "@/lib/supabase/client";
 import { cn, formatVND, sleep, tomorrowISO } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
-import type { DailyMenu } from "@/types";
+import type { DailyMenu, Order } from "@/types";
 
 type Phase = "idle" | "loading" | "success";
 
 const vnpayEnabled = process.env.NEXT_PUBLIC_VNPAY_ENABLED === "true";
+const cassoEnabled = process.env.NEXT_PUBLIC_CASSO_ENABLED === "true";
 
 export default function FoodPage() {
   const router = useRouter();
   const currentUser = useAuthStore((s) => s.currentUser);
   const addOrder = useOrdersStore((s) => s.addOrder);
+  const allOrders = useOrdersStore((s) => s.orders);
 
   const { data: allMenus = [], isLoading: menusLoading } = useMenus();
 
@@ -53,8 +55,33 @@ export default function FoodPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [vnpayBusy, setVnpayBusy] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
+  const [creatingPending, setCreatingPending] = useState(false);
   const [pickupCode, setPickupCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const livePending = pendingOrder
+    ? allOrders.find((o) => o.id === pendingOrder.id)
+    : null;
+
+  useEffect(() => {
+    if (!livePending || livePending.paymentStatus !== "paid" || phase !== "idle") {
+      return;
+    }
+    let cancelled = false;
+    setPickupCode(livePending.pickupCode ?? "");
+    setPhase("success");
+    (async () => {
+      await sleep(2400);
+      if (cancelled) return;
+      setShowPayment(false);
+      setPendingOrder(null);
+      router.push("/orders");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [livePending, phase, router]);
 
   const selectedItems = menus
     .map((m) => ({ menu: m, qty: quantities[m.id] || 0 }))
@@ -103,6 +130,30 @@ export default function FoodPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Đặt cơm thất bại.");
       setPhase("idle");
+    }
+  }
+
+  async function handleCreatePendingOrder() {
+    if (creatingPending || selectedItems.length === 0) return;
+    setCreatingPending(true);
+    setError(null);
+
+    try {
+      const order = await createFoodOrderUnpaid({
+        items: selectedItems.map((x) => ({
+          menuId: x.menu.id,
+          dishName: x.menu.dishName,
+          price: x.menu.price,
+          quantity: x.qty,
+        })),
+        totalAmount,
+      });
+      addOrder(order);
+      setPendingOrder(order);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không tạo được lệnh thanh toán.");
+    } finally {
+      setCreatingPending(false);
     }
   }
 
@@ -308,29 +359,63 @@ export default function FoodPage() {
             >
               <div className="mb-4 flex items-center gap-2">
                 <QrCode className="size-5 text-emerald-600" />
-                <h2 className="text-lg font-bold">Thanh toán VietQR</h2>
+                <h2 className="text-lg font-bold">
+                  {cassoEnabled ? "Thanh toán chuyển khoản" : "Thanh toán VietQR"}
+                </h2>
               </div>
 
-              <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-muted/30 p-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={buildVietQRUrl("FOOD", totalAmount)}
-                  alt="VietQR"
-                  className="size-48 rounded-xl bg-white p-2"
-                />
-                <div className="w-full space-y-1 text-center text-sm">
-                  <p className="font-medium">{BANK_INFO.bankName}</p>
-                  <p className="tabular-nums">{BANK_INFO.accountNumber}</p>
-                  <p className="text-muted-foreground">{BANK_INFO.accountName}</p>
-                  <p className="mt-2 font-semibold text-emerald-600">
+              {cassoEnabled && !pendingOrder ? (
+                <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-muted/30 p-5 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {totalQty} suất · nhận trưa mai tại điểm tụ
+                  </p>
+                  <p className="text-2xl font-extrabold tabular-nums text-emerald-600 dark:text-emerald-400">
                     {formatVND(totalAmount)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Nội dung: {" "}
-                    {buildTransferContent(currentUser.roomNumber, "FOOD")}
+                    Tạo lệnh thanh toán để nhận QR — hệ thống tự xác nhận khi tiền
+                    về tài khoản nhà bếp.
                   </p>
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-muted/30 p-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={
+                      pendingOrder
+                        ? buildVietQRUrl(pendingOrder.code, pendingOrder.totalAmount)
+                        : buildVietQRUrl("FOOD", totalAmount)
+                    }
+                    alt="VietQR"
+                    className="size-48 rounded-xl bg-white p-2"
+                  />
+                  <div className="w-full space-y-1 text-center text-sm">
+                    <p className="font-medium">{BANK_INFO.bankName}</p>
+                    <p className="tabular-nums">{BANK_INFO.accountNumber}</p>
+                    <p className="text-muted-foreground">{BANK_INFO.accountName}</p>
+                    <p className="mt-2 font-semibold text-emerald-600">
+                      {formatVND(pendingOrder?.totalAmount ?? totalAmount)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Nội dung: {" "}
+                      {pendingOrder
+                        ? buildTransferContent(currentUser.roomNumber, pendingOrder.code)
+                        : buildTransferContent(currentUser.roomNumber, "FOOD")}
+                    </p>
+                    {pendingOrder && (
+                      <p className="font-mono text-sm font-bold tracking-widest">
+                        {pendingOrder.code}
+                      </p>
+                    )}
+                  </div>
+                  {pendingOrder && phase === "idle" && (
+                    <div className="flex items-center gap-2 text-xs text-sky-600 dark:text-sky-400">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Đang chờ tiền về — tự động xác nhận trong ít phút...
+                    </div>
+                  )}
+                </div>
+              )}
 
               {error && (
                 <motion.p
@@ -342,7 +427,7 @@ export default function FoodPage() {
                 </motion.p>
               )}
 
-              {vnpayEnabled && (
+              {vnpayEnabled && !cassoEnabled && (
                 <div className="mt-4">
                   <TapButton
                     onClick={handleVnpayPayment}
@@ -363,15 +448,45 @@ export default function FoodPage() {
                 </div>
               )}
 
-              <p className="mt-3 text-center text-xs text-muted-foreground">
-                {vnpayEnabled
-                  ? "Hoặc chuyển khoản thủ công qua VietQR bên dưới:"
-                  : "Sau khi chuyển khoản, bấm xác nhận bên dưới để ghi đơn vào hệ thống."}
-              </p>
+              {cassoEnabled ? (
+                <div className="mt-4">
+                  {!pendingOrder ? (
+                    <TapButton
+                      onClick={handleCreatePendingOrder}
+                      disabled={creatingPending}
+                      className="w-full bg-emerald-600 shadow-emerald-600/30"
+                    >
+                      {creatingPending ? (
+                        <Loader2 className="size-5 animate-spin" />
+                      ) : (
+                        "Tạo lệnh thanh toán"
+                      )}
+                    </TapButton>
+                  ) : (
+                    <TapButton
+                      onClick={() => {
+                        setShowPayment(false);
+                        setPendingOrder(null);
+                        setError(null);
+                      }}
+                      disabled={phase !== "idle"}
+                      className="w-full border border-border bg-muted/40 text-foreground shadow-none"
+                    >
+                      Đóng — đơn đã lưu, chờ tiền về
+                    </TapButton>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
+                    {vnpayEnabled
+                      ? "Hoặc chuyển khoản thủ công qua VietQR bên dưới:"
+                      : "Sau khi chuyển khoản, bấm xác nhận bên dưới để ghi đơn vào hệ thống."}
+                  </p>
 
-              <div className="mt-4">
-                <TapButton
-                  onClick={handleConfirmPayment}
+                  <div className="mt-4">
+                    <TapButton
+                      onClick={handleConfirmPayment}
                   disabled={phase !== "idle"}
                   className={cn(
                     "w-full",
@@ -414,7 +529,9 @@ export default function FoodPage() {
                     )}
                   </AnimatePresence>
                 </TapButton>
-              </div>
+                  </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}
