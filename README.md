@@ -57,7 +57,7 @@ Chưa cấu hình env? App hiển thị màn hình **Setup** kèm hướng dẫn
 Mặc định trang đặt cơm dùng VietQR + xác nhận thủ công. Khi cấu hình VNPay, sinh viên sẽ thanh toán qua cổng VNPay bằng QR ngân hàng bất kỳ và hệ thống **tự động xác nhận** qua IPN.
 
 1. Đăng ký merchant sandbox tại [sandbox.vnpayment.vn/devreg](https://sandbox.vnpayment.vn/devreg/) để nhận `vnp_TmnCode` + `vnp_HashSecret` (miễn phí, production cần hợp đồng với VNPay).
-2. Chạy thêm [`supabase/migration-002-vnpay.sql`](supabase/migration-002-vnpay.sql) (RPC `create_food_order_unpaid`) và [`supabase/migration-003-water-qr.sql`](supabase/migration-003-water-qr.sql) (RPC `confirm_water_payment_self` — xác nhận chuyển khoản đơn nước khi chưa nối Casso) trong SQL Editor.
+2. Chạy thêm [`supabase/migration-002-vnpay.sql`](supabase/migration-002-vnpay.sql) (RPC `create_food_order_unpaid`) và [`supabase/migration-003-water-qr.sql`](supabase/migration-003-water-qr.sql) (RPC `confirm_payment_self` — xác nhận chuyển khoản đơn nước/cơm khi chưa nối Casso) trong SQL Editor.
 3. Lấy `service_role` key ở Supabase → **Settings → API**.
 4. Thêm env vars vào `.env.local` và Vercel:
 
