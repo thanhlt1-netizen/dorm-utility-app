@@ -1,5 +1,5 @@
 -- ============================================================
--- Dorm Utility App · Supabase schema
+-- Dorm Utility App · Supabase schema (production)
 -- Chạy toàn bộ file này trong SQL Editor của Supabase project.
 -- ============================================================
 
@@ -28,6 +28,7 @@ create table public.orders (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
   user_id uuid not null references public.users (id) on delete cascade,
+  user_name text not null default '',
   type public.order_type not null,
   status public.order_status not null default 'pending',
   room_number text not null,
@@ -132,6 +133,155 @@ set search_path = public
 as $$
   select role from public.users where id = auth.uid()
 $$;
+
+-- ---------- RPC: tạo đơn đổi nước ----------
+create or replace function public.create_water_order(
+  p_bottle_count integer,
+  p_note text,
+  p_total_amount integer
+)
+returns public.orders
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user public.users;
+  v_order public.orders;
+begin
+  if auth.uid() is null then
+    raise exception 'Chưa đăng nhập';
+  end if;
+
+  select * into v_user from public.users where id = auth.uid();
+  if v_user.id is null then
+    raise exception 'Không tìm thấy hồ sơ người dùng';
+  end if;
+
+  insert into public.orders (
+    code, user_id, user_name, type, status, room_number,
+    total_amount, payment_status, note
+  )
+  values (
+    'KTX-W' || floor(random() * 900 + 100)::int || (extract(epoch from now())::bigint % 100),
+    v_user.id, v_user.full_name, 'water', 'pending', v_user.room_number,
+    p_total_amount, 'unpaid', nullif(trim(p_note), '')
+  )
+  returning * into v_order;
+
+  insert into public.water_order_details (order_id, bottle_count)
+  values (v_order.id, p_bottle_count);
+
+  return v_order;
+end;
+$$;
+
+-- ---------- RPC: tạo đơn cơm (trừ suất kho nguyên tử) ----------
+create or replace function public.create_food_order(
+  p_items jsonb,
+  p_total_amount integer
+)
+returns public.orders
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user public.users;
+  v_order public.orders;
+  v_item jsonb;
+  v_menu_id uuid;
+  v_qty integer;
+begin
+  if auth.uid() is null then
+    raise exception 'Chưa đăng nhập';
+  end if;
+
+  select * into v_user from public.users where id = auth.uid();
+  if v_user.id is null then
+    raise exception 'Không tìm thấy hồ sơ người dùng';
+  end if;
+
+  if jsonb_array_length(p_items) = 0 then
+    raise exception 'Giỏ hàng trống';
+  end if;
+
+  insert into public.orders (
+    code, user_id, user_name, type, status, room_number,
+    total_amount, payment_status, pickup_code
+  )
+  values (
+    'KTX-F' || floor(random() * 900 + 100)::int || (extract(epoch from now())::bigint % 100),
+    v_user.id, v_user.full_name, 'food', 'confirmed', v_user.room_number,
+    p_total_amount, 'paid',
+    lpad((floor(random() * 900000) + 100000)::text, 6, '0')
+  )
+  returning * into v_order;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_menu_id := (v_item ->> 'menuId')::uuid;
+    v_qty := (v_item ->> 'quantity')::int;
+
+    update public.daily_menus
+    set remaining = remaining - v_qty
+    where id = v_menu_id and is_active and remaining >= v_qty;
+
+    if not found then
+      raise exception 'Món % vừa hết suất', v_item ->> 'dishName';
+    end if;
+
+    insert into public.food_order_details (
+      order_id, menu_id, dish_name, price, quantity, pickup_date, pickup_time_slot
+    )
+    values (
+      v_order.id, v_menu_id,
+      v_item ->> 'dishName',
+      (v_item ->> 'price')::int,
+      v_qty,
+      current_date + 1,
+      '11:30 - 12:30'
+    );
+  end loop;
+
+  return v_order;
+end;
+$$;
+
+-- ---------- RPC: xác nhận lấy đồ bằng mã 6 số ----------
+create or replace function public.complete_pickup(p_code text)
+returns public.orders
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_role public.user_role;
+  v_order public.orders;
+begin
+  select role into v_role from public.users where id = auth.uid();
+  if v_role is null or v_role not in ('staff', 'vendor', 'admin') then
+    raise exception 'Không có quyền xác nhận lấy đồ';
+  end if;
+
+  update public.orders
+  set status = 'completed'
+  where pickup_code = p_code
+    and type = 'food'
+    and status <> 'completed'
+  returning * into v_order;
+
+  if v_order.id is null then
+    raise exception 'Không tìm thấy mã hoặc đơn đã hoàn thành';
+  end if;
+
+  return v_order;
+end;
+$$;
+
+revoke execute on function public.create_water_order(integer, text, integer) from anon;
+revoke execute on function public.create_food_order(jsonb, integer) from anon;
+revoke execute on function public.complete_pickup(text) from anon;
 
 -- ---------- Row Level Security ----------
 alter table public.users enable row level security;
