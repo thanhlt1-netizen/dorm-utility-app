@@ -187,7 +187,7 @@ export default function HomePage() {
 
 function ActiveOrderCard({ order }: { order: import("@/types").Order }) {
   return (
-    <Link href="/orders">
+    <Link href={`/orders/${order.id}`}>
       <Card className="mb-2.5 p-4 transition-shadow active:shadow-md">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -275,7 +275,7 @@ function ServiceCard({
 
 function RecentOrderRow({ order }: { order: import("@/types").Order }) {
   return (
-    <Link href="/orders">
+    <Link href={`/orders/${order.id}`}>
       <Card className="flex items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <div
