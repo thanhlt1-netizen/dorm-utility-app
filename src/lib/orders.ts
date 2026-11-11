@@ -140,6 +140,33 @@ export async function createFoodOrder(input: {
   };
 }
 
+export async function createFoodOrderUnpaid(input: {
+  items: { menuId: string; dishName: string; price: number; quantity: number }[];
+  totalAmount: number;
+}): Promise<Order> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc("create_food_order_unpaid", {
+    p_items: input.items,
+    p_total_amount: input.totalAmount,
+  });
+  if (error) throw error;
+
+  const order = mapOrderRow(data as OrderRow);
+  return {
+    ...order,
+    foodDetails: {
+      dishes: input.items.map((item) => ({
+        dishId: item.menuId,
+        dishName: item.dishName,
+        price: item.price,
+        quantity: item.quantity,
+      })),
+      pickupDate: "",
+      pickupTimeSlot: "11:30 - 12:30",
+    },
+  };
+}
+
 export async function claimWaterOrder(
   orderId: string,
   staff: { id: string; fullName: string }
