@@ -45,3 +45,9 @@ export function generatePickupCode() {
 export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+export function roleHome(role: "resident" | "staff" | "vendor" | "admin") {
+  if (role === "staff") return "/dashboard";
+  if (role === "vendor") return "/kitchen";
+  return "/";
+}
