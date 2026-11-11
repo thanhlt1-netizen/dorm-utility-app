@@ -171,8 +171,8 @@ export default function WaterPage() {
               <motion.button
                 whileTap={{ scale: 0.85 }}
                 transition={{ type: "spring", stiffness: 500, damping: 22 }}
-                onClick={() => setBottleCount((c) => Math.min(4, c + 1))}
-                disabled={bottleCount >= 4}
+                onClick={() => setBottleCount((c) => Math.min(2, c + 1))}
+                disabled={bottleCount >= 2}
                 className="flex size-12 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-600/30 disabled:opacity-40"
                 aria-label="Tăng số bình"
               >
@@ -181,7 +181,7 @@ export default function WaterPage() {
             </div>
 
             <div className="mt-5 flex justify-center gap-1.5">
-              {[1, 2, 3, 4].map((n) => (
+              {[1, 2].map((n) => (
                 <motion.span
                   key={n}
                   animate={{
@@ -193,6 +193,10 @@ export default function WaterPage() {
                 />
               ))}
             </div>
+
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Tối đa 2 bình mỗi lần · 1 yêu cầu mỗi ngày
+            </p>
           </Card>
         </motion.div>
 
