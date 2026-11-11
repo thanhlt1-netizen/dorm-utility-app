@@ -33,15 +33,6 @@ export function tomorrowISO() {
   return d.toISOString().slice(0, 10);
 }
 
-export function generateOrderCode(type: "water" | "food") {
-  const n = Math.floor(100 + Math.random() * 900);
-  return `KTX-${type === "water" ? "W" : "F"}${n}${Date.now() % 100}`;
-}
-
-export function generatePickupCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
-
 export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
