@@ -6,7 +6,10 @@ import {
   Check,
   ChefHat,
   Loader2,
+  Minus,
+  Plus,
   Search,
+  Trash2,
   UtensilsCrossed,
 } from "lucide-react";
 import { StatusBadge } from "@/components/animated/status-badge";
@@ -14,8 +17,11 @@ import { TapButton } from "@/components/animated/tap-button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ScreenHeader } from "@/components/shared/screen-header";
 import { Card } from "@/components/ui/card";
-import { seedMenus } from "@/lib/mock-data";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { cn, formatTime, formatVND, sleep, tomorrowISO } from "@/lib/utils";
+import { useMenusStore } from "@/stores/menus-store";
 import { useOrdersStore } from "@/stores/orders-store";
 import type { Order } from "@/types";
 
@@ -240,48 +246,240 @@ export default function VendorKitchenPage() {
           </>
         )}
 
-        {tab === "menu" && (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Thực đơn ngày mai (đọc từ dữ liệu mẫu). Có thể mở rộng thành form
-              chỉnh sửa sau.
-            </p>
-            {seedMenus.map((menu) => (
-              <Card key={menu.id} className="p-4">
+        {tab === "menu" && <MenuEditor />}
+      </div>
+    </div>
+  );
+}
+
+function MenuEditor() {
+  const { menus, hydrated, addMenu, updateMenu, removeMenu } = useMenusStore();
+  const [showForm, setShowForm] = useState(false);
+  const [dishName, setDishName] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [maxQuantity, setMaxQuantity] = useState("");
+
+  const tomorrowMenus = menus.filter((m) => m.date === tomorrowISO());
+
+  function handleAdd() {
+    const name = dishName.trim();
+    const parsedPrice = Number(price);
+    const parsedQty = Number(maxQuantity);
+    if (!name || !parsedPrice || !parsedQty || parsedQty < 1) return;
+
+    addMenu({
+      id: `d-${Date.now()}`,
+      date: tomorrowISO(),
+      dishName: name,
+      description: description.trim(),
+      price: parsedPrice,
+      imageUrl: "",
+      maxQuantity: parsedQty,
+      remaining: parsedQty,
+      isActive: true,
+      nutritionTags: [],
+    });
+    setDishName("");
+    setDescription("");
+    setPrice("");
+    setMaxQuantity("");
+    setShowForm(false);
+  }
+
+  if (!hydrated) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-28 w-full rounded-3xl" />
+        <Skeleton className="h-28 w-full rounded-3xl" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Thực đơn ngày mai · {tomorrowMenus.length} món
+        </p>
+        <TapButton
+          onClick={() => setShowForm((v) => !v)}
+          className="bg-emerald-600 px-3.5 py-2 text-xs shadow-emerald-600/25"
+        >
+          <span className="flex items-center gap-1">
+            <Plus className="size-3.5" /> Thêm món
+          </span>
+        </TapButton>
+      </div>
+
+      <AnimatePresence initial={false}>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 32 }}
+            className="overflow-hidden"
+          >
+            <Card className="space-y-2.5 p-4">
+              <Input
+                value={dishName}
+                onChange={(e) => setDishName(e.target.value)}
+                placeholder="Tên món (VD: Cơm gà xào sả)"
+              />
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Mô tả ngắn"
+                className="min-h-16"
+              />
+              <div className="flex gap-2.5">
+                <Input
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Giá (VNĐ)"
+                  inputMode="numeric"
+                  className="flex-1"
+                />
+                <Input
+                  value={maxQuantity}
+                  onChange={(e) =>
+                    setMaxQuantity(e.target.value.replace(/\D/g, ""))
+                  }
+                  placeholder="Số suất"
+                  inputMode="numeric"
+                  className="w-28"
+                />
+              </div>
+              <TapButton
+                onClick={handleAdd}
+                disabled={!dishName.trim() || !Number(price) || !Number(maxQuantity)}
+                className="w-full bg-emerald-600 text-sm shadow-emerald-600/25"
+              >
+                Thêm vào thực đơn mai
+              </TapButton>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {tomorrowMenus.length === 0 ? (
+        <EmptyState
+          icon={UtensilsCrossed}
+          title="Chưa có món cho ngày mai"
+          description="Bấm Thêm món để đăng bán cho sinh viên đặt."
+        />
+      ) : (
+        <AnimatePresence mode="popLayout" initial={false}>
+          {tomorrowMenus.map((menu) => (
+            <motion.div
+              key={menu.id}
+              layout
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 340, damping: 30 }}
+            >
+              <Card className={cn("p-4", !menu.isActive && "opacity-60")}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <UtensilsCrossed className="size-4 text-emerald-600" />
-                      <h3 className="font-semibold">{menu.dishName}</h3>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                      {menu.description}
-                    </p>
-                    <div className="mt-2 flex gap-1.5">
-                      {menu.nutritionTags.map((t) => (
-                        <span
-                          key={t}
-                          className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400"
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
+                    <h3 className="font-semibold leading-snug">{menu.dishName}</h3>
+                    {menu.description && (
+                      <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                        {menu.description}
+                      </p>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <p className="font-extrabold tabular-nums text-emerald-600">
-                      {formatVND(menu.price)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Còn {menu.remaining}/{menu.maxQuantity}
-                    </p>
+                  <p className="shrink-0 font-extrabold tabular-nums text-emerald-600 dark:text-emerald-400">
+                    {formatVND(menu.price)}
+                  </p>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+                  <div className="flex items-center gap-2">
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      onClick={() =>
+                        updateMenu(menu.id, {
+                          remaining: Math.max(0, menu.remaining - 1),
+                        })
+                      }
+                      disabled={menu.remaining === 0}
+                      className="flex size-8 items-center justify-center rounded-lg border border-border disabled:opacity-40"
+                      aria-label="Giảm số suất"
+                    >
+                      <Minus className="size-3.5" />
+                    </motion.button>
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      <motion.span
+                        key={menu.remaining}
+                        initial={{ opacity: 0, y: 6, scale: 0.85 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -6, scale: 0.85 }}
+                        className="w-14 text-center text-sm font-semibold tabular-nums"
+                      >
+                        Còn {menu.remaining}/{menu.maxQuantity}
+                      </motion.span>
+                    </AnimatePresence>
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      onClick={() =>
+                        updateMenu(menu.id, {
+                          remaining: Math.min(
+                            menu.maxQuantity,
+                            menu.remaining + 1
+                          ),
+                        })
+                      }
+                      disabled={menu.remaining >= menu.maxQuantity}
+                      className="flex size-8 items-center justify-center rounded-lg bg-emerald-600 text-white disabled:opacity-40"
+                      aria-label="Tăng số suất"
+                    >
+                      <Plus className="size-3.5" />
+                    </motion.button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        updateMenu(menu.id, { isActive: !menu.isActive })
+                      }
+                      className={cn(
+                        "relative h-6 w-11 rounded-full transition-colors",
+                        menu.isActive ? "bg-emerald-600" : "bg-border"
+                      )}
+                      aria-label={
+                        menu.isActive ? "Đang bán — tắt" : "Đang tắt — bật"
+                      }
+                    >
+                      <motion.span
+                        layout
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 30,
+                        }}
+                        className={cn(
+                          "absolute top-0.5 size-5 rounded-full bg-white shadow",
+                          menu.isActive ? "right-0.5" : "left-0.5"
+                        )}
+                      />
+                    </button>
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      onClick={() => removeMenu(menu.id)}
+                      className="flex size-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-500/10"
+                      aria-label="Xoá món"
+                    >
+                      <Trash2 className="size-4" />
+                    </motion.button>
                   </div>
                 </div>
               </Card>
-            ))}
-          </div>
-        )}
-      </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      )}
     </div>
   );
 }
