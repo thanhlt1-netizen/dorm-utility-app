@@ -87,7 +87,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 
 export const ROLE_LABEL: Record<Role, string> = {
   resident: "Sinh viên",
-  staff: "Ban quản lý",
+  staff: "Trực KTX",
   vendor: "Nhà bếp",
   admin: "Quản lý KTX",
 };
