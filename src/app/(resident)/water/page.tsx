@@ -14,7 +14,11 @@ import {
   buildTransferContent,
   buildVietQRUrl,
 } from "@/lib/payment";
-import { confirmPaymentSelf, createWaterOrder } from "@/lib/orders";
+import {
+  confirmPaymentSelf,
+  createWaterOrder,
+  setOrderPaymentMethod,
+} from "@/lib/orders";
 import { cn, formatVND, sleep } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
@@ -78,6 +82,10 @@ export default function WaterPage() {
         totalAmount: total,
       });
       addOrder(order);
+      await setOrderPaymentMethod(
+        order.code,
+        payMethod === "qr" ? "bank_transfer" : "cash"
+      ).catch(() => undefined);
 
       if (payMethod === "qr") {
         setPhase("idle");
