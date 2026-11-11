@@ -31,7 +31,7 @@ Build production: `pnpm build && pnpm start`.
 ## Thiết lập Supabase (bắt buộc)
 
 1. Tạo project tại [supabase.com](https://supabase.com).
-2. Mở **SQL Editor**, dán và chạy toàn bộ [`supabase/schema.sql`](supabase/schema.sql) — tạo 5 bảng (`users`, `orders`, `water_order_details`, `daily_menus`, `food_order_details`), enums, trigger `updated_at`, trigger tự tạo profile khi signup, 3 RPC (`create_water_order`, `create_food_order`, `complete_pickup`), RLS policies, realtime publication và seed thực đơn ngày mai.
+2. Mở **SQL Editor**, dán và chạy toàn bộ [`supabase/schema.sql`](supabase/schema.sql) — tạo 5 bảng (`users`, `orders`, `water_order_details`, `daily_menus`, `food_order_details`), enums, trigger `updated_at`, trigger tự tạo profile khi signup, 3 RPC (`create_water_order`, `create_food_order`, `complete_pickup`), RLS policies, realtime publication và seed thực đơn ngày mai. Sau đó chạy tiếp [`supabase/migration-004-payment-method.sql`](supabase/migration-004-payment-method.sql) (RPC `set_order_payment_method` — đổi hình thức thanh toán tiền mặt ⇄ chuyển khoản QR khi đơn còn chờ tiếp nhận).
 3. **Authentication → Providers**: bật Email. Giữ "Confirm email" và đổi template **Confirm Signup** (Authentication → Emails) dùng `{{ .Token }}` thay cho `{{ .ConfirmationURL }}` — sinh viên sẽ nhận **mã OTP 6 số** và nhập trực tiếp trong app (hoặc tắt "Confirm email" để vào dùng luôn).
 4. Tạo tài khoản **staff / vendor / admin** trong **Authentication → Users** (app tự tạo row `users` qua trigger với role mặc định `resident`), rồi nâng quyền trong SQL Editor:
 
@@ -99,6 +99,30 @@ Trang `/login` có 4 tab vai trò:
 
 Đơn hàng cập nhật realtime qua channel `orders-realtime`; tạo đơn nước/cơm và xác nhận mã lấy đồ đi qua RPC `security definer` để chống gian lận (trừ kho nguyên tử, kiểm tra quyền ở server).
 
+Đơn nước đang **chờ tiếp nhận** có thể đổi hình thức thanh toán (tiền mặt ⇄ chuyển khoản QR) ngay tại trang chi tiết đơn; đơn cơm luôn thanh toán online trước để nhà bếp nhìn thấy.
+
+## Tạo tài khoản quản lý (staff / vendor / admin)
+
+Tài khoản quản lý **không tự đăng kí được** — phải được tạo từ Supabase Dashboard:
+
+1. Vào **Authentication → Users → Add user → Create new user**, nhập email + mật khẩu, bật **Auto Confirm User** rồi tạo.
+2. Copy **UUID** của user vừa tạo (cột ID trong danh sách users).
+3. Mở **SQL Editor**, nâng quyền (chọn 1 trong 3):
+
+```sql
+update public.users set role = 'staff'  where id = '<uuid>';  -- Ban quản lý
+update public.users set role = 'vendor' where id = '<uuid>';  -- Nhà bếp
+update public.users set role = 'admin'  where id = '<uuid>';  -- Quản lý KTX
+```
+
+4. Đăng nhập app bằng email/mật khẩu vừa tạo ở tab vai trò tương ứng.
+
+Lưu ý:
+
+- Quyền được đọc từ bảng `public.users` ở server (`current_app_role()`), nên bắt buộc update đúng bảng này — không phải bảng auth.
+- Nếu user đã đăng nhập trước khi nâng quyền, cần **đăng xuất rồi đăng nhập lại** để app nạp quyền mới.
+- Cách thay thế: cho user tự đăng kí qua app như sinh viên (nhận OTP email), rồi chạy SQL nâng quyền như trên.
+
 ## Cấu trúc
 
 ```
@@ -123,6 +147,7 @@ src/
 - [x] Trang đăng nhập 4 vai trò (sinh viên tự đăng kí, staff/vendor/admin tài khoản cố định)
 - [x] Home + flow Đổi nước (tiền mặt hoặc chuyển khoản QR)
 - [x] Casso webhook tự xác nhận VietQR realtime cho cả đơn nước + cơm
+- [x] Đổi hình thức thanh toán (tiền mặt ⇄ QR) khi đơn nước còn chờ tiếp nhận
 - [x] Flow Đặt cơm + VietQR
 - [x] Lịch sử đơn + chi tiết đơn với Timeline trạng thái
 - [x] Staff dashboard + Vendor kitchen
