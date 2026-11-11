@@ -2,7 +2,6 @@
 
 import { create } from "zustand";
 import type { Order } from "@/types";
-import { seedOrders } from "@/lib/mock-data";
 
 interface OrdersState {
   orders: Order[];
@@ -13,7 +12,7 @@ interface OrdersState {
 }
 
 export const useOrdersStore = create<OrdersState>((set) => ({
-  orders: seedOrders,
+  orders: [],
   hydrated: false,
   setOrders: (orders) => set({ orders, hydrated: true }),
   addOrder: (order) => set((s) => ({ orders: [order, ...s.orders] })),
