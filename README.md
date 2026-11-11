@@ -2,7 +2,7 @@
 
 Web app mobile-first (PWA) cho sinh viên ký túc xá với 2 dịch vụ:
 
-- **Đổi nước 20L** — sinh viên tạo yêu cầu, ban quản lý/sinh viên trực ca nhận và giao; thanh toán tiền mặt khi nhận nước hoặc chuyển khoản QR (tự xác nhận qua Casso).
+- **Đổi nước 20L** — sinh viên tạo yêu cầu (tối đa 2 bình/lần, 1 yêu cầu/ngày), huỷ được trước khi tiếp nhận; ban quản lý/sinh viên trực ca nhận và giao; thanh toán tiền mặt khi nhận nước hoặc chuyển khoản QR (tự xác nhận qua Casso).
 - **Đặt cơm trưa** — đặt chiều nay, nhận trưa mai; thanh toán VietQR, lấy đồ tại điểm tụ bằng mã 6 số.
 
 App chạy **production thật**: mọi dữ liệu ghi/đọc trực tiếp Supabase (PostgreSQL + RLS + RPC), không còn dữ liệu mẫu.
@@ -31,7 +31,7 @@ Build production: `pnpm build && pnpm start`.
 ## Thiết lập Supabase (bắt buộc)
 
 1. Tạo project tại [supabase.com](https://supabase.com).
-2. Mở **SQL Editor**, dán và chạy toàn bộ [`supabase/schema.sql`](supabase/schema.sql) — tạo 5 bảng (`users`, `orders`, `water_order_details`, `daily_menus`, `food_order_details`), enums, trigger `updated_at`, trigger tự tạo profile khi signup, 3 RPC (`create_water_order`, `create_food_order`, `complete_pickup`), RLS policies, realtime publication và seed thực đơn ngày mai. Sau đó chạy tiếp [`supabase/migration-004-payment-method.sql`](supabase/migration-004-payment-method.sql) (RPC `set_order_payment_method` — đổi hình thức thanh toán tiền mặt ⇄ chuyển khoản QR khi đơn còn chờ tiếp nhận).
+2. Mở **SQL Editor**, dán và chạy toàn bộ [`supabase/schema.sql`](supabase/schema.sql) — tạo 5 bảng (`users`, `orders`, `water_order_details`, `daily_menus`, `food_order_details`), enums, trigger `updated_at`, trigger tự tạo profile khi signup, 3 RPC (`create_water_order`, `create_food_order`, `complete_pickup`), RLS policies, realtime publication và seed thực đơn ngày mai. Sau đó chạy tiếp [`supabase/migration-004-payment-method.sql`](supabase/migration-004-payment-method.sql) (RPC `set_order_payment_method` — đổi hình thức thanh toán tiền mặt ⇄ chuyển khoản QR khi đơn còn chờ tiếp nhận) và [`supabase/migration-005-water-limits.sql`](supabase/migration-005-water-limits.sql) (RPC `cancel_water_order_self` + giới hạn 2 bình/lần, 1 yêu cầu/ngày).
 3. **Authentication → Providers**: bật Email. Giữ "Confirm email" và đổi template **Confirm Signup** (Authentication → Emails) dùng `{{ .Token }}` thay cho `{{ .ConfirmationURL }}` — sinh viên sẽ nhận **mã OTP 6 số** và nhập trực tiếp trong app (hoặc tắt "Confirm email" để vào dùng luôn).
 4. Tạo tài khoản **staff / vendor / admin** trong **Authentication → Users** (app tự tạo row `users` qua trigger với role mặc định `resident`), rồi nâng quyền trong SQL Editor:
 
@@ -148,6 +148,7 @@ src/
 - [x] Home + flow Đổi nước (tiền mặt hoặc chuyển khoản QR)
 - [x] Casso webhook tự xác nhận VietQR realtime cho cả đơn nước + cơm
 - [x] Đổi hình thức thanh toán (tiền mặt ⇄ QR) khi đơn nước còn chờ tiếp nhận
+- [x] Huỷ yêu cầu đổi nước trước khi tiếp nhận + chống spam (2 bình/lần, 1 yêu cầu/ngày)
 - [x] Flow Đặt cơm + VietQR
 - [x] Lịch sử đơn + chi tiết đơn với Timeline trạng thái
 - [x] Staff dashboard + Vendor kitchen
