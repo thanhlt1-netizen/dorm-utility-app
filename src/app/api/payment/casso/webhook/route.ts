@@ -20,6 +20,7 @@ interface CassoWebhookBody {
 interface OrderRow {
   id: string;
   code: string;
+  type: string;
   total_amount: number;
   payment_status: string;
 }
@@ -33,7 +34,7 @@ function serviceClient() {
 }
 
 function extractOrderCode(description: string): string | null {
-  const match = description.toUpperCase().match(/KTX-F\d+/);
+  const match = description.toUpperCase().match(/KTX-[FW]\d+/);
   return match ? match[0] : null;
 }
 
@@ -69,9 +70,9 @@ export async function POST(request: Request) {
 
     const { data: order } = await supabase
       .from("orders")
-      .select("id, code, total_amount, payment_status")
+      .select("id, code, type, total_amount, payment_status")
       .eq("code", code)
-      .eq("type", "food")
+      .in("type", ["food", "water"])
       .eq("payment_status", "unpaid")
       .maybeSingle();
 
@@ -81,7 +82,11 @@ export async function POST(request: Request) {
 
     const { error: updateError } = await supabase
       .from("orders")
-      .update({ payment_status: "paid", status: "confirmed" })
+      .update(
+        row.type === "food"
+          ? { payment_status: "paid", status: "confirmed" }
+          : { payment_status: "paid" }
+      )
       .eq("id", row.id)
       .eq("payment_status", "unpaid");
 
