@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
   ChefHat,
+  Database,
   Droplets,
   GraduationCap,
   HardHat,
@@ -14,7 +15,6 @@ import {
 } from "lucide-react";
 import { TapButton } from "@/components/animated/tap-button";
 import { Input } from "@/components/ui/input";
-import { DEMO_ACCOUNTS, DEMO_PASSWORD, findMockAccount } from "@/lib/demo-accounts";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { signInWithPassword, signUpWithProfile } from "@/lib/supabase/auth";
 import { cn, roleHome } from "@/lib/utils";
@@ -33,9 +33,7 @@ export default function LoginPage() {
   const hydrated = useAuthStore((s) => s.hydrated);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const currentUser = useAuthStore((s) => s.currentUser);
-  const signInSession = useAuthStore((s) => s.signInSession);
-  const addMockAccount = useAuthStore((s) => s.addMockAccount);
-  const mockAccounts = useAuthStore((s) => s.mockAccounts);
+  const setSession = useAuthStore((s) => s.setSession);
 
   const [role, setRole] = useState<Role>("resident");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -61,8 +59,8 @@ export default function LoginPage() {
     setShakeKey((k) => k + 1);
   }
 
-  function finish(user: User, authMode: "mock" | "supabase", userEmail: string) {
-    signInSession(user, authMode, userEmail);
+  function finish(user: User) {
+    setSession(user);
     setSuccessUser(user);
     setTimeout(() => router.replace(roleHome(user.role)), 900);
   }
@@ -79,11 +77,30 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      if (isSupabaseConfigured) {
-        await supabaseFlow(trimmedEmail);
-      } else {
-        mockFlow(trimmedEmail);
+      if (role === "resident" && mode === "signup") {
+        if (!fullName.trim() || !roomNumber.trim()) {
+          fail("Nhập đầy đủ họ tên và số phòng.");
+          return;
+        }
+        await signUpWithProfile(trimmedEmail, password, {
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          roomNumber: roomNumber.trim(),
+          studentId: studentId.trim(),
+        });
+        try {
+          const user = await signInWithPassword(trimmedEmail, password);
+          finish(user);
+        } catch {
+          setError(
+            "Tạo tài khoản thành công. Hãy xác nhận email rồi đăng nhập."
+          );
+        }
+        return;
       }
+
+      const user = await signInWithPassword(trimmedEmail, password);
+      finish(user);
     } catch (e) {
       fail(e instanceof Error ? e.message : "Đăng nhập thất bại.");
     } finally {
@@ -91,69 +108,57 @@ export default function LoginPage() {
     }
   }
 
-  async function supabaseFlow(trimmedEmail: string) {
-    if (role === "resident" && mode === "signup") {
-      if (!fullName.trim() || !roomNumber.trim()) {
-        fail("Nhập đầy đủ họ tên và số phòng.");
-        return;
-      }
-      await signUpWithProfile(trimmedEmail, password, {
-        fullName: fullName.trim(),
-        phone: phone.trim(),
-        roomNumber: roomNumber.trim(),
-        studentId: studentId.trim(),
-      });
-      try {
-        const user = await signInWithPassword(trimmedEmail, password);
-        finish(user, "supabase", trimmedEmail);
-      } catch {
-        setError("Tạo tài khoản thành công. Hãy xác nhận email rồi đăng nhập.");
-      }
-      return;
-    }
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="flex min-h-dvh flex-col justify-center px-6 py-10">
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          className="mb-6 flex flex-col items-center text-center"
+        >
+          <div className="flex size-16 items-center justify-center rounded-3xl bg-gradient-to-br from-sky-500 to-sky-700 shadow-lg shadow-sky-600/30">
+            <Database className="size-8 text-white" />
+          </div>
+          <h1 className="mt-4 text-2xl font-extrabold tracking-tight">
+            Chưa kết nối Supabase
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            App chạy chế độ production, cần Supabase để hoạt động.
+          </p>
+        </motion.div>
 
-    const user = await signInWithPassword(trimmedEmail, password);
-    finish(user, "supabase", trimmedEmail);
-  }
-
-  function mockFlow(trimmedEmail: string) {
-    if (role === "resident" && mode === "signup") {
-      if (!fullName.trim() || !roomNumber.trim()) {
-        fail("Nhập đầy đủ họ tên và số phòng.");
-        return;
-      }
-      if (mockAccounts.some((a) => a.email === trimmedEmail)) {
-        fail("Email này đã được đăng ký. Hãy đăng nhập.");
-        return;
-      }
-      const user: User = {
-        id: `u-${Date.now()}`,
-        fullName: fullName.trim(),
-        phone: phone.trim(),
-        roomNumber: roomNumber.trim(),
-        role: "resident",
-        studentId: studentId.trim(),
-      };
-      addMockAccount({ email: trimmedEmail, password, user });
-      finish(user, "mock", trimmedEmail);
-      return;
-    }
-
-    const demo = findMockAccount(trimmedEmail, password);
-    const registered = mockAccounts.find(
-      (a) => a.email === trimmedEmail && a.password === password
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 28, delay: 0.06 }}
+          className="space-y-2.5 rounded-3xl border border-border/60 bg-card p-5 text-sm"
+        >
+          {[
+            "Tạo project trên supabase.com (Free tier).",
+            "Mở SQL Editor, dán và chạy toàn bộ supabase/schema.sql.",
+            "Authentication → Providers → bật Email, tắt Confirm email nếu muốn đăng ký vào dùng ngay.",
+            "Tạo tài khoản staff/vendor/admin trong Authentication → Users, rồi UPDATE bảng users SET role = 'staff' | 'vendor' | 'admin'.",
+            "Thêm 2 biến môi trường NEXT_PUBLIC_SUPABASE_URL và NEXT_PUBLIC_SUPABASE_ANON_KEY vào Vercel → redeploy.",
+          ].map((step, idx) => (
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 + idx * 0.06 }}
+              className="flex gap-3"
+            >
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-xs font-bold text-sky-600 dark:text-sky-400">
+                {idx + 1}
+              </span>
+              <p className="text-[13px] leading-relaxed text-muted-foreground">
+                {step}
+              </p>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
     );
-    const user = demo?.user ?? registered?.user;
-
-    if (!user) {
-      fail("Email hoặc mật khẩu không đúng.");
-      return;
-    }
-    if (user.role !== role) {
-      fail(`Tài khoản này không phải ${ROLE_LABEL[role]}.`);
-      return;
-    }
-    finish(user, "mock", trimmedEmail);
   }
 
   if (!hydrated || isAuthenticated || successUser) {
@@ -178,7 +183,6 @@ export default function LoginPage() {
     );
   }
 
-  const demoForRole = DEMO_ACCOUNTS.find((a) => a.user.role === role);
   const isResident = role === "resident";
 
   return (
@@ -221,10 +225,11 @@ export default function LoginPage() {
                   transition={{ type: "spring", stiffness: 420, damping: 32 }}
                   className={cn(
                     "absolute inset-0 rounded-2xl",
-                    value === "resident" && "bg-sky-600 shadow-md shadow-sky-600/25",
-                    value === "staff" && "bg-sky-600 shadow-md shadow-sky-600/25",
-                    value === "vendor" && "bg-emerald-600 shadow-md shadow-emerald-600/25",
-                    value === "admin" && "bg-violet-600 shadow-md shadow-violet-600/25"
+                    value === "vendor"
+                      ? "bg-emerald-600 shadow-md shadow-emerald-600/25"
+                      : value === "admin"
+                        ? "bg-violet-600 shadow-md shadow-violet-600/25"
+                        : "bg-sky-600 shadow-md shadow-sky-600/25"
                   )}
                 />
               )}
@@ -248,7 +253,7 @@ export default function LoginPage() {
               {(
                 [
                   { value: "signin", label: "Đăng nhập" },
-                  { value: "signup", label: "Đăng ký" },
+                  { value: "signup", label: "Đăng kí" },
                 ] as const
               ).map((m) => {
                 const active = mode === m.value;
@@ -367,27 +372,13 @@ export default function LoginPage() {
               "Đăng nhập"
             )}
           </TapButton>
-
-          {!isSupabaseConfigured && (
-            <div className="mt-4 rounded-2xl bg-muted/50 px-3.5 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
-              <p className="font-semibold text-foreground">Tài khoản dùng thử</p>
-              <p className="mt-0.5 tabular-nums">
-                {demoForRole?.email} · {DEMO_PASSWORD}
-              </p>
-              {!isResident && (
-                <p className="mt-1">
-                  Tài khoản {ROLE_LABEL[role].toLowerCase()} do ban quản lý cấp sẵn.
-                </p>
-              )}
-            </div>
-          )}
         </div>
       </motion.div>
 
       <p className="mt-5 text-center text-[11px] leading-relaxed text-muted-foreground">
-        {isSupabaseConfigured
-          ? "Sinh viên tự đăng ký. Tài khoản Ban quản lý / Nhà bếp / Quản lý do admin cấp."
-          : "Chưa kết nối Supabase — đang chạy chế độ demo với dữ liệu mẫu."}
+        {isResident
+          ? "Sinh viên tự đăng kí tài khoản và đăng nhập."
+          : `Tài khoản ${ROLE_LABEL[role].toLowerCase()} do admin cấp sẵn.`}
       </p>
     </div>
   );
