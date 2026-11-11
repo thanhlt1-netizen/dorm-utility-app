@@ -2,37 +2,62 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Role, User } from "@/types";
+import type { User } from "@/types";
 import { seedUsers } from "@/lib/mock-data";
+
+export interface MockAccount {
+  email: string;
+  password: string;
+  user: User;
+}
 
 type AuthMode = "mock" | "supabase";
 
 interface AuthState {
   currentUser: User;
-  users: User[];
+  isAuthenticated: boolean;
   authMode: AuthMode;
   email: string | null;
-  switchRole: (role: Role) => void;
-  setUser: (user: User, mode: AuthMode, email: string | null) => void;
-  resetToMock: () => void;
+  mockAccounts: MockAccount[];
+  hydrated: boolean;
+  markHydrated: () => void;
+  signInSession: (user: User, mode: AuthMode, email: string) => void;
+  addMockAccount: (account: MockAccount) => void;
+  signOut: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       currentUser: seedUsers[0],
-      users: seedUsers,
+      isAuthenticated: false,
       authMode: "mock",
       email: null,
-      switchRole: (role) => {
-        const user = get().users.find((u) => u.role === role);
-        if (user) set({ currentUser: user });
-      },
-      setUser: (user, mode, email) =>
-        set({ currentUser: user, authMode: mode, email }),
-      resetToMock: () =>
-        set({ currentUser: seedUsers[0], authMode: "mock", email: null }),
+      mockAccounts: [],
+      hydrated: false,
+      markHydrated: () => set({ hydrated: true }),
+      signInSession: (user, mode, email) =>
+        set({ currentUser: user, isAuthenticated: true, authMode: mode, email }),
+      addMockAccount: (account) =>
+        set((s) => ({ mockAccounts: [...s.mockAccounts, account] })),
+      signOut: () =>
+        set({
+          currentUser: seedUsers[0],
+          isAuthenticated: false,
+          authMode: "mock",
+          email: null,
+        }),
     }),
-    { name: "dorm-auth" }
+    {
+      name: "dorm-auth",
+      skipHydration: true,
+      partialize: (state) => ({
+        currentUser: state.currentUser,
+        isAuthenticated: state.isAuthenticated,
+        authMode: state.authMode,
+        email: state.email,
+        mockAccounts: state.mockAccounts,
+      }),
+    }
   )
 );
