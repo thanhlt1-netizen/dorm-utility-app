@@ -56,11 +56,11 @@ export async function signUpWithProfile(
   email: string,
   password: string,
   meta: { fullName: string; phone: string; roomNumber: string; studentId: string }
-): Promise<void> {
+): Promise<{ needsEmailConfirmation: boolean; user: User | null }> {
   const supabase = getSupabase();
   if (!supabase) throw new Error("Supabase chưa được cấu hình");
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -74,6 +74,13 @@ export async function signUpWithProfile(
     },
   });
   if (error) throw error;
+
+  if (!data.session || !data.user) {
+    return { needsEmailConfirmation: true, user: null };
+  }
+
+  const user = await fetchProfile(data.user.id);
+  return { needsEmailConfirmation: false, user };
 }
 
 export async function fetchProfile(userId: string): Promise<User> {
