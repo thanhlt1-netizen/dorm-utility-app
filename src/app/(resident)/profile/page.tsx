@@ -7,20 +7,20 @@ import { TapButton } from "@/components/animated/tap-button";
 import { ScreenHeader } from "@/components/shared/screen-header";
 import { Card } from "@/components/ui/card";
 import { useTheme } from "@/hooks/use-theme";
+import { signOutSupabase } from "@/lib/supabase/auth";
 import { useAuthStore } from "@/stores/auth-store";
 import { ROLE_LABEL } from "@/types";
 
 export default function ProfilePage() {
   const router = useRouter();
   const currentUser = useAuthStore((s) => s.currentUser);
-  const authMode = useAuthStore((s) => s.authMode);
-  const email = useAuthStore((s) => s.email);
   const signOut = useAuthStore((s) => s.signOut);
   const { theme, toggle } = useTheme();
   const [busy, setBusy] = useState(false);
 
-  function handleSignOut() {
+  async function handleSignOut() {
     setBusy(true);
+    await signOutSupabase();
     signOut();
     router.replace("/login");
   }
@@ -40,7 +40,7 @@ export default function ProfilePage() {
               Phòng {currentUser.roomNumber} · {ROLE_LABEL[currentUser.role]}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              {email ?? currentUser.phone}
+              {currentUser.phone || currentUser.roomNumber}
             </p>
           </div>
         </Card>
@@ -83,8 +83,7 @@ export default function ProfilePage() {
         </TapButton>
 
         <p className="pt-2 text-center text-xs text-muted-foreground">
-          Dorm Utility · phiên bản 0.2.0 ·{" "}
-          {authMode === "supabase" ? "Supabase" : "Demo"}
+          Dorm Utility · phiên bản 1.0.0 · Supabase
         </p>
       </div>
     </div>
