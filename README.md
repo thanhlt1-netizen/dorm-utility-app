@@ -2,7 +2,7 @@
 
 Web app mobile-first (PWA) cho sinh viên ký túc xá với 2 dịch vụ:
 
-- **Đổi nước 20L** — sinh viên tạo yêu cầu (tối đa 2 bình/lần, 1 yêu cầu/ngày), huỷ được trước khi tiếp nhận; ban quản lý/sinh viên trực ca nhận và giao; thanh toán tiền mặt khi nhận nước hoặc chuyển khoản QR (tự xác nhận qua Casso).
+- **Đổi nước 20L** — sinh viên tạo yêu cầu (tối đa 2 bình/lần, 1 yêu cầu/ngày), hủy được trước khi tiếp nhận; ban quản lý/sinh viên trực ca nhận và giao; thanh toán tiền mặt khi nhận nước hoặc chuyển khoản QR (tự xác nhận qua Casso).
 - **Đặt cơm trưa** — đặt chiều nay, nhận trưa mai; thanh toán VietQR, lấy đồ tại điểm tụ bằng mã 6 số.
 
 App chạy **production thật**: mọi dữ liệu ghi/đọc trực tiếp Supabase (PostgreSQL + RLS + RPC), không còn dữ liệu mẫu.
@@ -73,7 +73,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
    - **Return URL**: `https://<domain>/api/payment/vnpay/return`
    - **IPN URL**: `https://<domain>/api/payment/vnpay/ipn`
 
-Luồng: tạo đơn `unpaid` (giữ suất) → redirect sang VNPay → sinh viên quét QR → VNPay gọi IPN (ký HMAC-SHA512, đối chiếu số tiền) → đơn chuyển `paid` + realtime cập nhật. Đơn không thanh toán trong 15 phút có thể huỷ thủ công bởi vendor/admin.
+Luồng: tạo đơn `unpaid` (giữ suất) → redirect sang VNPay → sinh viên quét QR → VNPay gọi IPN (ký HMAC-SHA512, đối chiếu số tiền) → đơn chuyển `paid` + realtime cập nhật. Đơn không thanh toán trong 15 phút có thể hủy thủ công bởi vendor/admin.
 
 ## Tự xác nhận VietQR qua Casso (tuỳ chọn)
 
@@ -95,7 +95,7 @@ Luồng: bấm "Tạo lệnh thanh toán" → đơn `unpaid` giữ suất + QR k
 Trang `/login` có 4 tab vai trò:
 
 - **Sinh viên** — tự đăng kí (họ tên, phòng, MSSV, email, mật khẩu) → nhập **mã OTP 6 số** gửi qua email để kích hoạt và vào app luôn; role luôn cố định `resident` ở server.
-- **Ban quản lý / Nhà bếp / Quản lý KTX** — đăng nhập bằng tài khoản admin cấp sẵn; quyền lấy từ bảng `users`, không thể tự nâng.
+- **Trực KTX / Nhà bếp / Quản lý KTX** — đăng nhập bằng tên tài khoản admin cấp (vd `nv1`, tự thêm `@ktx.vn`); quyền lấy từ bảng `users`, không thể tự nâng.
 
 Đơn hàng cập nhật realtime qua channel `orders-realtime`; tạo đơn nước/cơm và xác nhận mã lấy đồ đi qua RPC `security definer` để chống gian lận (trừ kho nguyên tử, kiểm tra quyền ở server).
 
@@ -103,25 +103,35 @@ Trang `/login` có 4 tab vai trò:
 
 ## Tạo tài khoản quản lý (staff / vendor / admin)
 
-Tài khoản quản lý **không tự đăng kí được** — phải được tạo từ Supabase Dashboard:
+Tài khoản quản lý **không tự đăng kí được** — tạo theo 2 bước (script sẵn: `supabase/create-accounts.sql`):
 
-1. Vào **Authentication → Users → Add user → Create new user**, nhập email + mật khẩu, bật **Auto Confirm User** rồi tạo.
-2. Copy **UUID** của user vừa tạo (cột ID trong danh sách users).
-3. Mở **SQL Editor**, nâng quyền (chọn 1 trong 3):
+1. **Dashboard**: Authentication → Users → Add user → Create new user, nhập email + mật khẩu, bật **Auto Confirm User**. Lặp lại cho đủ 9 tài khoản:
 
-```sql
-update public.users set role = 'staff'  where id = '<uuid>';  -- Ban quản lý
-update public.users set role = 'vendor' where id = '<uuid>';  -- Nhà bếp
-update public.users set role = 'admin'  where id = '<uuid>';  -- Quản lý KTX
-```
+   | Tài khoản | Email | Mật khẩu | Vai trò | Tên hiển thị |
+   |---|---|---|---|---|
+   | nv1 | nv1@ktx.vn | nvktxbc1 | Trực KTX | Trực KTX 1 |
+   | nv2 | nv2@ktx.vn | nvktxbc2 | Trực KTX | Trực KTX 2 |
+   | nv3 | nv3@ktx.vn | nvktxbc3 | Trực KTX | Trực KTX 3 |
+   | nv4 | nv4@ktx.vn | nvktxbc4 | Trực KTX | Trực KTX 4 |
+   | vd1 | vd1@ktx.vn | vdnhaan1 | Nhà bếp | Nhà bếp 1 |
+   | vd2 | vd2@ktx.vn | vdnhaan2 | Nhà bếp | Nhà bếp 2 |
+   | vd3 | vd3@ktx.vn | vdnhaan3 | Nhà bếp | Nhà bếp 3 |
+   | vd4 | vd4@ktx.vn | vdnhaan4 | Nhà bếp | Nhà bếp 4 |
+   | admin | admin@ktx.vn | admin123 | Quản lý KTX | Quản lý KTX |
 
-4. Đăng nhập app bằng email/mật khẩu vừa tạo ở tab vai trò tương ứng.
+2. **SQL Editor**: chạy nguyên file `supabase/create-accounts.sql` — script tự gán `full_name` + `role` cho cả 9 user theo email, báo `OK` / `CHƯA CÓ` cho từng tài khoản. Chạy lại nhiều lần không sao.
+
+Cách đăng nhập trong app:
+
+- Chọn tab vai trò tương ứng, nhập **tên tài khoản** (vd `nv1`) — app tự thêm `@ktx.vn`; nhập email đầy đủ cũng được.
+- Mật khẩu tối thiểu 6 ký tự nên admin dùng `admin123` thay cho `admin` (đổi lại được ngay trong app sau khi đăng nhập).
+
+Đổi mật khẩu tự chủ: mọi vai trò vào **Cá nhân → Đổi mật khẩu** (staff / vendor bấm icon người ở góc phải màn hình chính). Mật khẩu mới tối thiểu 6 ký tự.
 
 Lưu ý:
 
 - Quyền được đọc từ bảng `public.users` ở server (`current_app_role()`), nên bắt buộc update đúng bảng này — không phải bảng auth.
 - Nếu user đã đăng nhập trước khi nâng quyền, cần **đăng xuất rồi đăng nhập lại** để app nạp quyền mới.
-- Cách thay thế: cho user tự đăng kí qua app như sinh viên (nhận OTP email), rồi chạy SQL nâng quyền như trên.
 
 ## Cấu trúc
 
@@ -156,6 +166,7 @@ src/
 - [x] Supabase schema + RLS + Auth + Realtime + RPC production
 - [x] Thanh toán VNPay QR tự động xác nhận (sandbox/production)
 - [x] Xác thực đăng kí bằng mã OTP 6 số qua email
+- [x] Tài khoản cố định nv1–nv4 / vd1–vd4 / admin + đổi mật khẩu tự chủ
 - [ ] Confetti + toast system
 - [ ] Service Worker offline đầy đủ
 - [ ] Admin console (thống kê)
