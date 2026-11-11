@@ -23,7 +23,7 @@ const filters: { value: OrderType | "all"; label: string }[] = [
 ];
 
 const VNPAY_FAIL_REASONS: Record<string, string> = {
-  "24": "Bạn đã hủy thanh toán tại cổng VNPay.",
+  "24": "Bạn đã huỷ thanh toán tại cổng VNPay.",
   "11": "Đã hết thời gian chờ thanh toán.",
   "51": "Tài khoản không đủ số dư.",
   invalid_signature: "Chữ ký không hợp lệ.",
