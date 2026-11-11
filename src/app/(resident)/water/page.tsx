@@ -14,7 +14,7 @@ import {
   buildTransferContent,
   buildVietQRUrl,
 } from "@/lib/payment";
-import { confirmWaterPaymentSelf, createWaterOrder } from "@/lib/orders";
+import { confirmPaymentSelf, createWaterOrder } from "@/lib/orders";
 import { cn, formatVND, sleep } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
@@ -101,7 +101,7 @@ export default function WaterPage() {
     setError(null);
 
     try {
-      const paid = await confirmWaterPaymentSelf(pendingOrder.code);
+      const paid = await confirmPaymentSelf(pendingOrder.code);
       updateOrder(paid.id, { paymentStatus: "paid" });
       setPhase("success");
       await sleep(2200);
