@@ -9,10 +9,10 @@ import { TapButton } from "@/components/animated/tap-button";
 import { ScreenHeader } from "@/components/shared/screen-header";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { generateOrderCode, formatVND, sleep } from "@/lib/utils";
+import { createWaterOrder } from "@/lib/orders";
+import { formatVND, sleep } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
-import type { Order } from "@/types";
 
 const SERVICE_FEE_PER_BOTTLE = 20000;
 
@@ -25,35 +25,29 @@ export default function WaterPage() {
   const [bottleCount, setBottleCount] = useState(1);
   const [note, setNote] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
+  const [error, setError] = useState<string | null>(null);
 
   const total = bottleCount * SERVICE_FEE_PER_BOTTLE;
 
   async function handleSubmit() {
     if (phase !== "idle") return;
     setPhase("loading");
+    setError(null);
 
-    const now = new Date().toISOString();
-    const order: Order = {
-      id: `o-${Date.now()}`,
-      code: generateOrderCode("water"),
-      userId: currentUser.id,
-      userName: currentUser.fullName,
-      roomNumber: currentUser.roomNumber,
-      type: "water",
-      status: "pending",
-      totalAmount: total,
-      paymentStatus: "unpaid",
-      note: note.trim() || undefined,
-      createdAt: now,
-      updatedAt: now,
-      waterDetails: { bottleCount },
-    };
-
-    addOrder(order);
-    await sleep(1400);
-    setPhase("success");
-    await sleep(1800);
-    router.push("/orders");
+    try {
+      const order = await createWaterOrder({
+        bottleCount,
+        note: note.trim() || undefined,
+        totalAmount: total,
+      });
+      addOrder(order);
+      setPhase("success");
+      await sleep(1800);
+      router.push("/orders");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gửi yêu cầu thất bại.");
+      setPhase("idle");
+    }
   }
 
   return (
@@ -171,6 +165,19 @@ export default function WaterPage() {
           </Card>
         </motion.div>
       </div>
+
+      <AnimatePresence>
+        {error && (
+          <motion.p
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mx-4 mb-2 text-center text-xs font-medium text-red-500"
+          >
+            {error}
+          </motion.p>
+        )}
+      </AnimatePresence>
 
       <div className="sticky bottom-0 border-t border-border/60 bg-background/80 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl">
         <TapButton
