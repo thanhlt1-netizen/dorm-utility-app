@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -17,7 +17,12 @@ import {
 import { TapButton } from "@/components/animated/tap-button";
 import { Input } from "@/components/ui/input";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { signInWithPassword, signUpWithProfile } from "@/lib/supabase/auth";
+import {
+  resendSignupOtp,
+  signInWithPassword,
+  signUpWithProfile,
+  verifySignupOtp,
+} from "@/lib/supabase/auth";
 import { cn, roleHome } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { ROLE_LABEL, type Role, type User } from "@/types";
@@ -50,6 +55,10 @@ export default function LoginPage() {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
   const [successUser, setSuccessUser] = useState<User | null>(null);
+  const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
+  const [otpBusy, setOtpBusy] = useState(false);
+  const [resendIn, setResendIn] = useState(60);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     if (hydrated && isAuthenticated) {
@@ -65,6 +74,87 @@ export default function LoginPage() {
   function resetFormState() {
     setError(null);
     setNotice(null);
+  }
+
+  useEffect(() => {
+    if (!pendingEmail) return;
+    setOtp(Array(6).fill(""));
+    setResendIn(60);
+    const timer = setInterval(() => {
+      setResendIn((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [pendingEmail]);
+
+  async function verifyOtp(code: string) {
+    if (otpBusy || !pendingEmail || code.length < 6) return;
+    setOtpBusy(true);
+    resetFormState();
+    try {
+      const user = await verifySignupOtp(pendingEmail, code);
+      finish(user);
+    } catch (e) {
+      fail(e instanceof Error ? e.message : "Mã OTP không đúng.");
+      setOtp(Array(6).fill(""));
+      otpRefs.current[0]?.focus();
+    } finally {
+      setOtpBusy(false);
+    }
+  }
+
+  function handleOtpChange(idx: number, raw: string) {
+    if (otpBusy) return;
+    const digits = raw.replace(/\D/g, "");
+    const next = [...otp];
+    if (!digits) {
+      next[idx] = "";
+    } else {
+      let cursor = idx;
+      for (const digit of digits) {
+        if (cursor > 5) break;
+        next[cursor] = digit;
+        cursor += 1;
+      }
+      const focusIdx = Math.min(cursor, 5);
+      requestAnimationFrame(() => otpRefs.current[focusIdx]?.focus());
+    }
+    setOtp(next);
+    const code = next.join("");
+    if (code.length === 6 && !code.includes("")) void verifyOtp(code);
+  }
+
+  function handleOtpKeyDown(idx: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace" && !otp[idx] && idx > 0) {
+      otpRefs.current[idx - 1]?.focus();
+    }
+  }
+
+  function handleOtpPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    e.preventDefault();
+    if (otpBusy) return;
+    const digits = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!digits) return;
+    const next = Array(6).fill("");
+    digits.split("").forEach((d, i) => {
+      next[i] = d;
+    });
+    setOtp(next);
+    if (digits.length === 6) void verifyOtp(digits);
+  }
+
+  async function handleResendOtp() {
+    if (resendIn > 0 || otpBusy || !pendingEmail) return;
+    setOtpBusy(true);
+    resetFormState();
+    try {
+      await resendSignupOtp(pendingEmail);
+      setResendIn(60);
+      setNotice(`Đã gửi lại mã mới tới ${pendingEmail}.`);
+    } catch (e) {
+      fail(e instanceof Error ? e.message : "Gửi lại mã thất bại.");
+    } finally {
+      setOtpBusy(false);
+    }
   }
 
   function finish(user: User) {
@@ -98,9 +188,7 @@ export default function LoginPage() {
         });
         if (result.needsEmailConfirmation) {
           setPendingEmail(trimmedEmail);
-          setNotice(
-            `Tạo tài khoản thành công! Kiểm tra hộp thư ${trimmedEmail} và bấm đường dẫn xác nhận, sau đó đăng nhập lại.`
-          );
+          setNotice(`Mã xác nhận 6 số đã được gửi tới ${trimmedEmail}.`);
         } else if (result.user) {
           finish(result.user);
         }
@@ -145,7 +233,7 @@ export default function LoginPage() {
           {[
             "Tạo project trên supabase.com (Free tier).",
             "Mở SQL Editor, dán và chạy toàn bộ supabase/schema.sql.",
-            "Authentication → Providers → bật Email, tắt Confirm email nếu muốn đăng ký vào dùng ngay.",
+            "Authentication → Providers → bật Email. Giữ Confirm email và đổi template Confirm Signup dùng {{ .Token }} để gửi mã OTP 6 số (hoặc tắt Confirm email để vào ngay).",
             "Tạo tài khoản staff/vendor/admin trong Authentication → Users, rồi UPDATE bảng users SET role = 'staff' | 'vendor' | 'admin'.",
             "Thêm 2 biến môi trường NEXT_PUBLIC_SUPABASE_URL và NEXT_PUBLIC_SUPABASE_ANON_KEY vào Vercel → redeploy.",
           ].map((step, idx) => (
@@ -256,6 +344,90 @@ export default function LoginPage() {
         transition={{ duration: 0.35 }}
       >
         <div className="rounded-3xl border border-border/60 bg-card p-5 shadow-sm">
+          {pendingEmail ? (
+            <div className="space-y-4">
+              <div className="flex flex-col items-center gap-1.5 text-center">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  className="flex size-12 items-center justify-center rounded-2xl bg-sky-500/10"
+                >
+                  <MailCheck className="size-6 text-sky-600 dark:text-sky-400" />
+                </motion.div>
+                <p className="text-sm font-semibold">Nhập mã xác nhận 6 số</p>
+                <p className="text-xs text-muted-foreground">
+                  Mã đã gửi tới{" "}
+                  <span className="font-medium text-foreground">{pendingEmail}</span>
+                </p>
+              </div>
+
+              <div className="flex justify-center gap-2">
+                {otp.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => {
+                      otpRefs.current[idx] = el;
+                    }}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                    onPaste={handleOtpPaste}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    disabled={otpBusy}
+                    className={cn(
+                      "size-12 rounded-xl border border-border bg-background text-center text-lg font-bold tabular-nums outline-none transition-all focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 disabled:opacity-50",
+                      digit && "border-sky-500/60 bg-sky-500/5"
+                    )}
+                  />
+                ))}
+              </div>
+
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center text-xs font-medium text-red-500"
+                >
+                  {error}
+                </motion.p>
+              )}
+              {notice && !error && (
+                <p className="text-center text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  {notice}
+                </p>
+              )}
+
+              {otpBusy ? (
+                <div className="flex items-center justify-center gap-2 py-1 text-xs text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin" /> Đang xác nhận mã...
+                </div>
+              ) : (
+                <div className="flex items-center justify-between text-xs">
+                  <button
+                    onClick={handleResendOtp}
+                    disabled={resendIn > 0}
+                    className="font-semibold text-sky-600 disabled:text-muted-foreground dark:text-sky-400"
+                  >
+                    {resendIn > 0 ? `Gửi lại sau ${resendIn}s` : "Gửi lại mã"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPendingEmail(null);
+                      setOtp(Array(6).fill(""));
+                      resetFormState();
+                    }}
+                    className="font-medium text-muted-foreground"
+                  >
+                    Dùng email khác
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
           {isResident && (
             <div className="mb-4 flex gap-1.5 rounded-2xl bg-muted/60 p-1">
               {(
@@ -364,26 +536,6 @@ export default function LoginPage() {
             </motion.p>
           )}
 
-          {notice && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-3 flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3"
-            >
-              <MailCheck className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                  {pendingEmail ? "Kiểm tra email của bạn" : notice}
-                </p>
-                {pendingEmail && (
-                  <p className="mt-1 text-xs leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
-                    {notice} Sau khi xác nhận, bấm tab “Đăng nhập” để vào app.
-                  </p>
-                )}
-              </div>
-            </motion.div>
-          )}
-
           <TapButton
             onClick={handleSubmit}
             disabled={busy}
@@ -400,6 +552,8 @@ export default function LoginPage() {
               "Đăng nhập"
             )}
           </TapButton>
+            </>
+          )}
         </div>
       </motion.div>
 
