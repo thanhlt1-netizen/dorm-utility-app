@@ -82,7 +82,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   in_progress: "Đang xử lý",
   ready: "Sẵn sàng lấy",
   completed: "Hoàn thành",
-  cancelled: "Đã huỷ",
+  cancelled: "Đã hủy",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
