@@ -28,7 +28,11 @@ import {
   buildTransferContent,
   buildVietQRUrl,
 } from "@/lib/payment";
-import { confirmPaymentSelf, setOrderPaymentMethod } from "@/lib/orders";
+import {
+  cancelWaterOrderSelf,
+  confirmPaymentSelf,
+  setOrderPaymentMethod,
+} from "@/lib/orders";
 import {
   cn,
   formatDayLabel,
@@ -51,9 +55,12 @@ export default function OrderDetailPage() {
   const [showPay, setShowPay] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
   const [phase, setPhase] = useState<"idle" | "success">("idle");
   const [error, setError] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const order = orders.find((o) => o.id === params.id);
   const unpaid = !!order && order.paymentStatus === "unpaid";
@@ -103,6 +110,27 @@ export default function OrderDetailPage() {
       );
     } finally {
       setSwitching(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (cancelling || !order) return;
+    if (!cancelConfirm) {
+      setCancelConfirm(true);
+      setTimeout(() => setCancelConfirm(false), 4000);
+      return;
+    }
+    setCancelling(true);
+    setCancelError(null);
+
+    try {
+      const cancelled = await cancelWaterOrderSelf(order.code);
+      updateOrder(cancelled.id, { status: cancelled.status });
+    } catch (e) {
+      setCancelError(e instanceof Error ? e.message : "Huỷ yêu cầu thất bại.");
+      setCancelConfirm(false);
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -281,6 +309,51 @@ export default function OrderDetailPage() {
             </Card>
           </motion.div>
         )}
+
+        {order.type === "water" &&
+          order.status === "pending" &&
+          order.paymentStatus === "unpaid" && (
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                type: "spring",
+                stiffness: 320,
+                damping: 28,
+                delay: 0.05,
+              }}
+            >
+              <Card className="p-4">
+                {cancelError && (
+                  <p className="mb-2 text-xs font-medium text-red-500">
+                    {cancelError}
+                  </p>
+                )}
+                <TapButton
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className={
+                    cancelConfirm
+                      ? "w-full bg-red-600 shadow-red-600/30"
+                      : "w-full border border-border bg-muted/40 text-foreground shadow-none"
+                  }
+                >
+                  {cancelling ? (
+                    <Loader2 className="size-5 animate-spin" />
+                  ) : cancelConfirm ? (
+                    "Bấm lần nữa để xác nhận huỷ"
+                  ) : (
+                    "Huỷ yêu cầu"
+                  )}
+                </TapButton>
+                {!cancelConfirm && !cancelling && (
+                  <p className="mt-2 text-center text-xs text-muted-foreground">
+                    Chỉ huỷ được trước khi ban quản lý tiếp nhận.
+                  </p>
+                )}
+              </Card>
+            </motion.div>
+          )}
 
         {order.type === "food" && order.pickupCode && order.status !== "completed" && (
           <motion.div
