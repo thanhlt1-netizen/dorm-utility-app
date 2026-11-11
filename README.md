@@ -52,6 +52,29 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 
 Chưa cấu hình env? App hiển thị màn hình **Setup** kèm hướng dẫn từng bước thay vì chạy demo.
 
+## Thanh toán VNPay QR (tuỳ chọn)
+
+Mặc định trang đặt cơm dùng VietQR + xác nhận thủ công. Khi cấu hình VNPay, sinh viên sẽ thanh toán qua cổng VNPay bằng QR ngân hàng bất kỳ và hệ thống **tự động xác nhận** qua IPN.
+
+1. Đăng ký merchant sandbox tại [sandbox.vnpayment.vn/devreg](https://sandbox.vnpayment.vn/devreg/) để nhận `vnp_TmnCode` + `vnp_HashSecret` (miễn phí, production cần hợp đồng với VNPay).
+2. Chạy thêm [`supabase/migration-002-vnpay.sql`](supabase/migration-002-vnpay.sql) trong SQL Editor (RPC `create_food_order_unpaid` tạo đơn giữ suất ở trạng thái chưa thanh toán).
+3. Lấy `service_role` key ở Supabase → **Settings → API**.
+4. Thêm env vars vào `.env.local` và Vercel:
+
+```
+NEXT_PUBLIC_VNPAY_ENABLED=true
+VNPAY_TMN_CODE=xxxx
+VNPAY_HASH_SECRET=xxxx
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+# VNPAY_ENV=production   # chỉ bật khi có thông số merchant thật
+```
+
+5. Trong dashboard VNPay, khai báo:
+   - **Return URL**: `https://<domain>/api/payment/vnpay/return`
+   - **IPN URL**: `https://<domain>/api/payment/vnpay/ipn`
+
+Luồng: tạo đơn `unpaid` (giữ suất) → redirect sang VNPay → sinh viên quét QR → VNPay gọi IPN (ký HMAC-SHA512, đối chiếu số tiền) → đơn chuyển `paid` + realtime cập nhật. Đơn không thanh toán trong 15 phút có thể huỷ thủ công bởi vendor/admin.
+
 ## Đăng nhập theo vai trò
 
 Trang `/login` có 4 tab vai trò:
@@ -70,9 +93,10 @@ src/
 │   ├── (resident)/         # Home, water, food, orders (+ orders/[id] chi tiết), profile
 │   ├── (staff)/dashboard   # Trực ca đổi nước
 │   ├── (vendor)/kitchen    # Nhà bếp: đơn hàng + thực đơn
+│   ├── api/payment/vnpay   # create / return / ipn (thanh toán VNPay QR)
 │   └── api/webhook/payment
 ├── components/{ui,shared,animated}
-├── lib/{supabase,payment.ts,utils.ts,orders.ts,menus.ts}
+├── lib/{supabase,payment.ts,utils.ts,orders.ts,menus.ts,vnpay.ts}
 ├── hooks/                  # use-theme, use-auth-session, use-orders, use-menus, use-realtime-orders
 ├── stores/                 # auth, orders, menus (Zustand)
 └── types/
@@ -88,6 +112,7 @@ src/
 - [x] Staff dashboard + Vendor kitchen
 - [x] Vendor chỉnh thực đơn thật (thêm món, bật/tắt, chỉnh số suất)
 - [x] Supabase schema + RLS + Auth + Realtime + RPC production
+- [x] Thanh toán VNPay QR tự động xác nhận (sandbox/production)
 - [ ] Confetti + toast system
 - [ ] Service Worker offline đầy đủ
 - [ ] Admin console (thống kê)
