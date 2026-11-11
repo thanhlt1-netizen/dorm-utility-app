@@ -1,8 +1,9 @@
--- Migration 003: đổi nước thanh toán chuyển khoản QR
--- RPC cho phép sinh viên tự xác nhận đã chuyển khoản đơn nước của chính mình
--- (dùng khi CHƯA nối Casso; khi đã nối Casso thì webhook tự xác nhận, không cần RPC này).
+-- Migration 003: thanh toán chuyển khoản QR cho đơn nước + cơm
+-- RPC cho phép chủ đơn tự xác nhận đã chuyển khoản (dùng khi CHƯA nối Casso;
+-- đã nối Casso thì webhook tự xác nhận, không cần RPC này).
+-- Chạy lại file này an toàn (create or replace).
 
-create or replace function public.confirm_water_payment_self(
+create or replace function public.confirm_payment_self(
   p_code text
 )
 returns public.orders
@@ -18,18 +19,20 @@ begin
   end if;
 
   select * into v_order from public.orders
-  where code = p_code and user_id = auth.uid() and type = 'water'
+  where code = p_code and user_id = auth.uid() and type in ('water', 'food')
   for update;
 
   if v_order.id is null then
-    raise exception 'Không tìm thấy đơn nước';
+    raise exception 'Không tìm thấy đơn';
   end if;
   if v_order.payment_status <> 'unpaid' then
     raise exception 'Đơn đã được thanh toán';
   end if;
 
   update public.orders
-  set payment_status = 'paid', updated_at = now()
+  set payment_status = 'paid',
+      status = case when type = 'food' then 'confirmed' else status end,
+      updated_at = now()
   where id = v_order.id
   returning * into v_order;
 
@@ -37,5 +40,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.confirm_water_payment_self(text) from anon;
-grant execute on function public.confirm_water_payment_self(text) to authenticated;
+drop function if exists public.confirm_water_payment_self(text);
+
+revoke execute on function public.confirm_payment_self(text) from anon;
+grant execute on function public.confirm_payment_self(text) to authenticated;
