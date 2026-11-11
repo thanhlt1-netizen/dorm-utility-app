@@ -11,6 +11,7 @@ import {
   GraduationCap,
   HardHat,
   Loader2,
+  MailCheck,
   ShieldCheck,
 } from "lucide-react";
 import { TapButton } from "@/components/animated/tap-button";
@@ -45,6 +46,8 @@ export default function LoginPage() {
   const [studentId, setStudentId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
   const [successUser, setSuccessUser] = useState<User | null>(null);
 
@@ -57,6 +60,11 @@ export default function LoginPage() {
   function fail(message: string) {
     setError(message);
     setShakeKey((k) => k + 1);
+  }
+
+  function resetFormState() {
+    setError(null);
+    setNotice(null);
   }
 
   function finish(user: User) {
@@ -74,7 +82,7 @@ export default function LoginPage() {
     }
 
     setBusy(true);
-    setError(null);
+    resetFormState();
 
     try {
       if (role === "resident" && mode === "signup") {
@@ -82,19 +90,19 @@ export default function LoginPage() {
           fail("Nhập đầy đủ họ tên và số phòng.");
           return;
         }
-        await signUpWithProfile(trimmedEmail, password, {
+        const result = await signUpWithProfile(trimmedEmail, password, {
           fullName: fullName.trim(),
           phone: phone.trim(),
           roomNumber: roomNumber.trim(),
           studentId: studentId.trim(),
         });
-        try {
-          const user = await signInWithPassword(trimmedEmail, password);
-          finish(user);
-        } catch {
-          setError(
-            "Tạo tài khoản thành công. Hãy xác nhận email rồi đăng nhập."
+        if (result.needsEmailConfirmation) {
+          setPendingEmail(trimmedEmail);
+          setNotice(
+            `Tạo tài khoản thành công! Kiểm tra hộp thư ${trimmedEmail} và bấm đường dẫn xác nhận, sau đó đăng nhập lại.`
           );
+        } else if (result.user) {
+          finish(result.user);
         }
         return;
       }
@@ -210,7 +218,7 @@ export default function LoginPage() {
               key={value}
               onClick={() => {
                 setRole(value);
-                setError(null);
+                resetFormState();
               }}
               className={cn(
                 "relative flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-xs font-semibold transition-colors",
@@ -262,7 +270,7 @@ export default function LoginPage() {
                     key={m.value}
                     onClick={() => {
                       setMode(m.value);
-                      setError(null);
+                      resetFormState();
                     }}
                     className="relative min-h-9 flex-1 rounded-xl text-xs font-semibold"
                   >
@@ -354,6 +362,26 @@ export default function LoginPage() {
             >
               {error}
             </motion.p>
+          )}
+
+          {notice && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-3 flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3"
+            >
+              <MailCheck className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  {pendingEmail ? "Kiểm tra email của bạn" : notice}
+                </p>
+                {pendingEmail && (
+                  <p className="mt-1 text-xs leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
+                    {notice} Sau khi xác nhận, bấm tab “Đăng nhập” để vào app.
+                  </p>
+                )}
+              </div>
+            </motion.div>
           )}
 
           <TapButton
