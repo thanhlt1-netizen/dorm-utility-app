@@ -130,6 +130,16 @@ export async function confirmPaymentSelf(code: string): Promise<Order> {
   return mapOrderRow(data as OrderRow);
 }
 
+export async function cancelWaterOrderSelf(code: string): Promise<Order> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase.rpc("cancel_water_order_self", {
+    p_code: code,
+  });
+  if (error) throw error;
+
+  return mapOrderRow(data as OrderRow);
+}
+
 export async function setOrderPaymentMethod(
   code: string,
   method: PaymentMethod
