@@ -12,6 +12,8 @@ export type OrderStatus =
 
 export type PaymentStatus = "unpaid" | "paid";
 
+export type PaymentMethod = "cash" | "bank_transfer";
+
 export interface User {
   id: string;
   fullName: string;
@@ -52,6 +54,7 @@ export interface Order {
   status: OrderStatus;
   totalAmount: number;
   paymentStatus: PaymentStatus;
+  paymentMethod?: PaymentMethod;
   pickupCode?: string;
   note?: string;
   createdAt: string;
@@ -79,7 +82,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   in_progress: "Đang xử lý",
   ready: "Sẵn sàng lấy",
   completed: "Hoàn thành",
-  cancelled: "Đã hủy",
+  cancelled: "Đã huỷ",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
