@@ -10,6 +10,7 @@ import {
   Plus,
   QrCode,
   UtensilsCrossed,
+  Wallet,
 } from "lucide-react";
 import { SuccessOverlay } from "@/components/animated/success-overlay";
 import { TapButton } from "@/components/animated/tap-button";
@@ -23,12 +24,15 @@ import {
 } from "@/lib/payment";
 import { useMenus } from "@/hooks/use-menus";
 import { createFoodOrder } from "@/lib/orders";
-import { formatVND, sleep, tomorrowISO } from "@/lib/utils";
+import { getSupabase } from "@/lib/supabase/client";
+import { cn, formatVND, sleep, tomorrowISO } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
 import type { DailyMenu } from "@/types";
 
 type Phase = "idle" | "loading" | "success";
+
+const vnpayEnabled = process.env.NEXT_PUBLIC_VNPAY_ENABLED === "true";
 
 export default function FoodPage() {
   const router = useRouter();
@@ -48,6 +52,7 @@ export default function FoodPage() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [showPayment, setShowPayment] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
+  const [vnpayBusy, setVnpayBusy] = useState(false);
   const [pickupCode, setPickupCode] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -98,6 +103,45 @@ export default function FoodPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Đặt cơm thất bại.");
       setPhase("idle");
+    }
+  }
+
+  async function handleVnpayPayment() {
+    if (vnpayBusy || selectedItems.length === 0) return;
+    setVnpayBusy(true);
+    setError(null);
+
+    try {
+      const supabase = getSupabase();
+      const token = (
+        await supabase!.auth.getSession()
+      ).data.session?.access_token;
+      if (!token) throw new Error("Phiên đăng nhập hết hạn, hãy đăng nhập lại.");
+
+      const res = await fetch("/api/payment/vnpay/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          items: selectedItems.map((x) => ({
+            menuId: x.menu.id,
+            dishName: x.menu.dishName,
+            price: x.menu.price,
+            quantity: x.qty,
+          })),
+          totalAmount,
+        }),
+      });
+      const data = (await res.json()) as { paymentUrl?: string; error?: string };
+      if (!res.ok || !data.paymentUrl) {
+        throw new Error(data.error ?? "Không tạo được lệnh thanh toán VNPay.");
+      }
+      window.location.href = data.paymentUrl;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Thanh toán VNPay thất bại.");
+      setVnpayBusy(false);
     }
   }
 
@@ -298,15 +342,43 @@ export default function FoodPage() {
                 </motion.p>
               )}
 
+              {vnpayEnabled && (
+                <div className="mt-4">
+                  <TapButton
+                    onClick={handleVnpayPayment}
+                    disabled={phase !== "idle" || vnpayBusy}
+                    className="w-full bg-sky-600 shadow-sky-600/30"
+                  >
+                    {vnpayBusy ? (
+                      <Loader2 className="size-5 animate-spin" />
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Wallet className="size-4" /> Thanh toán qua VNPay
+                      </span>
+                    )}
+                  </TapButton>
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                    Quét QR bằng app ngân hàng — xác nhận tự động qua VNPay.
+                  </p>
+                </div>
+              )}
+
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                Sau khi chuyển khoản, bấm xác nhận bên dưới để ghi đơn vào hệ thống.
+                {vnpayEnabled
+                  ? "Hoặc chuyển khoản thủ công qua VietQR bên dưới:"
+                  : "Sau khi chuyển khoản, bấm xác nhận bên dưới để ghi đơn vào hệ thống."}
               </p>
 
               <div className="mt-4">
                 <TapButton
                   onClick={handleConfirmPayment}
                   disabled={phase !== "idle"}
-                  className="w-full bg-emerald-600 shadow-emerald-600/30"
+                  className={cn(
+                    "w-full",
+                    vnpayEnabled
+                      ? "border border-border bg-muted/40 text-foreground shadow-none"
+                      : "bg-emerald-600 shadow-emerald-600/30"
+                  )}
                 >
                   <AnimatePresence mode="wait" initial={false}>
                     {phase === "idle" && (
