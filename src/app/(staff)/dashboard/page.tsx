@@ -8,7 +8,9 @@ import { TapButton } from "@/components/animated/tap-button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ScreenHeader } from "@/components/shared/screen-header";
 import { Card } from "@/components/ui/card";
-import { cn, formatTime, formatVND, sleep } from "@/lib/utils";
+import { useOrders } from "@/hooks/use-orders";
+import { claimWaterOrder, completeWaterOrder } from "@/lib/orders";
+import { cn, formatTime, formatVND } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
 import type { Order } from "@/types";
@@ -18,8 +20,10 @@ type Filter = "pending" | "in_progress" | "all";
 export default function StaffDashboardPage() {
   const currentUser = useAuthStore((s) => s.currentUser);
   const { orders, updateOrder } = useOrdersStore();
+  useOrders();
   const [filter, setFilter] = useState<Filter>("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const waterOrders = useMemo(
     () =>
@@ -41,32 +45,56 @@ export default function StaffDashboardPage() {
   async function claimOrder(order: Order) {
     if (busyId) return;
     setBusyId(order.id);
-    await sleep(600);
+    setActionError(null);
     updateOrder(order.id, {
       status: "in_progress",
       updatedAt: new Date().toISOString(),
       waterDetails: {
-        ...order.waterDetails!,
+        bottleCount: order.waterDetails?.bottleCount ?? 1,
         assignedStaffId: currentUser.id,
         assignedStaffName: `${currentUser.fullName} (Trực ca)`,
       },
     });
-    setBusyId(null);
+    try {
+      await claimWaterOrder(order.id, currentUser);
+    } catch (e) {
+      updateOrder(order.id, {
+        status: order.status,
+        updatedAt: order.updatedAt,
+        waterDetails: order.waterDetails,
+      });
+      setActionError(e instanceof Error ? e.message : "Nhận giao thất bại.");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function completeOrder(order: Order) {
     if (busyId) return;
     setBusyId(order.id);
-    await sleep(600);
+    setActionError(null);
     updateOrder(order.id, {
       status: "completed",
       updatedAt: new Date().toISOString(),
       waterDetails: {
-        ...order.waterDetails!,
+        bottleCount: order.waterDetails?.bottleCount ?? 1,
+        assignedStaffId: order.waterDetails?.assignedStaffId,
+        assignedStaffName: order.waterDetails?.assignedStaffName,
         completedAt: new Date().toISOString(),
       },
     });
-    setBusyId(null);
+    try {
+      await completeWaterOrder(order.id);
+    } catch (e) {
+      updateOrder(order.id, {
+        status: order.status,
+        updatedAt: order.updatedAt,
+        waterDetails: order.waterDetails,
+      });
+      setActionError(e instanceof Error ? e.message : "Cập nhật thất bại.");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -114,6 +142,16 @@ export default function StaffDashboardPage() {
       </div>
 
       <div className="flex-1 space-y-3 px-4 pb-8">
+        {actionError && (
+          <motion.p
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-xs font-medium text-red-500"
+          >
+            {actionError}
+          </motion.p>
+        )}
+
         {visible.length === 0 ? (
           <EmptyState
             icon={HardHat}
