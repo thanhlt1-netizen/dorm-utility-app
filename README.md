@@ -2,7 +2,7 @@
 
 Web app mobile-first (PWA) cho sinh viên ký túc xá với 2 dịch vụ:
 
-- **Đổi nước 20L** — sinh viên tạo yêu cầu (tối đa 2 bình/lần, 1 yêu cầu/ngày), hủy được trước khi tiếp nhận; ban quản lý/sinh viên trực ca nhận và giao; thanh toán tiền mặt khi nhận nước hoặc chuyển khoản QR (tự xác nhận qua Casso).
+- **Đổi nước 20L** — sinh viên tạo yêu cầu (tối đa 2 bình/lần, 1 yêu cầu/ngày), huỷ được trước khi tiếp nhận; ban quản lý/sinh viên trực ca nhận và giao; thanh toán tiền mặt khi nhận nước hoặc chuyển khoản QR (tự xác nhận qua Casso).
 - **Đặt cơm trưa** — đặt chiều nay, nhận trưa mai; thanh toán VietQR, lấy đồ tại điểm tụ bằng mã 6 số.
 
 App chạy **production thật**: mọi dữ liệu ghi/đọc trực tiếp Supabase (PostgreSQL + RLS + RPC), không còn dữ liệu mẫu.
@@ -73,7 +73,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
    - **Return URL**: `https://<domain>/api/payment/vnpay/return`
    - **IPN URL**: `https://<domain>/api/payment/vnpay/ipn`
 
-Luồng: tạo đơn `unpaid` (giữ suất) → redirect sang VNPay → sinh viên quét QR → VNPay gọi IPN (ký HMAC-SHA512, đối chiếu số tiền) → đơn chuyển `paid` + realtime cập nhật. Đơn không thanh toán trong 15 phút có thể hủy thủ công bởi vendor/admin.
+Luồng: tạo đơn `unpaid` (giữ suất) → redirect sang VNPay → sinh viên quét QR → VNPay gọi IPN (ký HMAC-SHA512, đối chiếu số tiền) → đơn chuyển `paid` + realtime cập nhật. Đơn không thanh toán trong 15 phút có thể huỷ thủ công bởi vendor/admin.
 
 ## Tự xác nhận VietQR qua Casso (tuỳ chọn)
 
