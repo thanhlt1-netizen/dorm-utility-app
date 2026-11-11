@@ -16,7 +16,7 @@ interface MenuRow {
 
 function requireSupabase() {
   const supabase = getSupabase();
-  if (!supabase) throw new Error("Supabase ch\u01b0a \u0111\u01b0\u1ee3c c\u1ea5u h\u00ecnh");
+  if (!supabase) throw new Error("Supabase chưa được cấu hình");
   return supabase;
 }
 
