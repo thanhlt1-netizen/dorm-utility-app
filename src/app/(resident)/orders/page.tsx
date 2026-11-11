@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { ClipboardList, Droplets, Package, UtensilsCrossed } from "lucide-react";
+import { Check, ClipboardList, Droplets, Package, UtensilsCrossed, XCircle } from "lucide-react";
 import { StatusBadge } from "@/components/animated/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ScreenHeader } from "@/components/shared/screen-header";
@@ -21,11 +22,54 @@ const filters: { value: OrderType | "all"; label: string }[] = [
   { value: "food", label: "Cơm trưa" },
 ];
 
+const VNPAY_FAIL_REASONS: Record<string, string> = {
+  "24": "Bạn đã huỷ thanh toán tại cổng VNPay.",
+  "11": "Đã hết thời gian chờ thanh toán.",
+  "51": "Tài khoản không đủ số dư.",
+  invalid_signature: "Chữ ký không hợp lệ.",
+};
+
 export default function OrdersPage() {
+  return (
+    <Suspense fallback={<OrdersSkeleton />}>
+      <OrdersContent />
+    </Suspense>
+  );
+}
+
+function OrdersSkeleton() {
+  return (
+    <div className="flex min-h-[calc(100dvh-3.5rem)] flex-col">
+      <ScreenHeader title="Đơn hàng của tôi" showBack={false} />
+      <div className="space-y-3 px-4 py-3">
+        <Skeleton className="h-24 w-full rounded-3xl" />
+        <Skeleton className="h-24 w-full rounded-3xl" />
+        <Skeleton className="h-24 w-full rounded-3xl" />
+      </div>
+    </div>
+  );
+}
+
+function OrdersContent() {
   const currentUser = useAuthStore((s) => s.currentUser);
   const { orders, hydrated } = useOrdersStore();
   useOrders();
   const [filter, setFilter] = useState<OrderType | "all">("all");
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const paymentResult = searchParams.get("payment");
+  const paidCode = searchParams.get("code");
+  const failReason = searchParams.get("reason");
+
+  useEffect(() => {
+    if (!paymentResult) return;
+    queryClient.invalidateQueries({ queryKey: ["orders"] });
+    const timer = setTimeout(() => {
+      router.replace("/orders", { scroll: false });
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [paymentResult, queryClient, router]);
 
   const myOrders = orders.filter((o) => o.userId === currentUser.id);
   const visible = filter === "all" ? myOrders : myOrders.filter((o) => o.type === filter);
@@ -95,6 +139,57 @@ export default function OrdersPage() {
           </AnimatePresence>
         )}
       </div>
+
+      <AnimatePresence>
+        {paymentResult === "success" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 24, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 12, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 380, damping: 26 }}
+              className="mx-6 flex w-full max-w-xs flex-col items-center rounded-3xl bg-card p-8 text-center shadow-2xl"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 400, damping: 18, delay: 0.1 }}
+                className="flex size-16 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
+              >
+                <Check className="size-8" />
+              </motion.div>
+              <h2 className="mt-4 text-lg font-bold">Thanh toán thành công!</h2>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {paidCode
+                  ? `Đơn ${paidCode} đã được xác nhận. Mang mã lấy đồ đến điểm tụ trưa mai.`
+                  : "Đơn của bạn đã được xác nhận."}
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+        {paymentResult === "failed" && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            className="fixed inset-x-0 bottom-24 z-[70] mx-auto flex w-[calc(100%-3rem)] max-w-sm items-start gap-2.5 rounded-2xl border border-red-500/30 bg-card p-4 shadow-xl"
+          >
+            <XCircle className="mt-0.5 size-5 shrink-0 text-red-500" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Thanh toán không thành công</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {VNPAY_FAIL_REASONS[failReason ?? ""] ??
+                  "Giao dịch chưa hoàn tất — bạn có thể thử thanh toán lại."}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
