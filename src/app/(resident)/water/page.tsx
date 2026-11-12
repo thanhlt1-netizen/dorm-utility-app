@@ -20,7 +20,7 @@ import {
   setOrderPaymentMethod,
 } from "@/lib/orders";
 import { createPayosCheckout } from "@/lib/payos-client";
-import { cn, formatVND, sleep } from "@/lib/utils";
+import { cn, formatVND, roomLabel, sleep } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
 import type { Order } from "@/types";
@@ -154,7 +154,7 @@ export default function WaterPage() {
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold">Số bình cần đổi</p>
               <span className="rounded-full bg-sky-500/10 px-2.5 py-1 text-xs font-medium text-sky-600 dark:text-sky-400">
-                Phòng {currentUser.roomNumber}
+                {roomLabel(currentUser.roomNumber)}
               </span>
             </div>
 
@@ -276,7 +276,7 @@ export default function WaterPage() {
           transition={{ type: "spring", stiffness: 300, damping: 28, delay: 0.08 }}
         >
           <Card className="p-5">
-            <p className="text-sm font-semibold">Ghi chú cho ban quản lý</p>
+            <p className="text-sm font-semibold">Ghi chú cho Trực KTX</p>
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -520,8 +520,8 @@ export default function WaterPage() {
         title={payMethod === "qr" ? "Thanh toán thành công!" : "Gửi yêu cầu thành công!"}
         message={
           payMethod === "qr"
-            ? `Đơn ${pendingOrder?.code ?? ""} đã được xác nhận. Ban quản lý sẽ giao nước tới phòng bạn.`
-            : "Ban quản lý sẽ nhận việc trong ít phút."
+            ? `Đơn ${pendingOrder?.code ?? ""} đã được xác nhận. Trực KTX sẽ giao nước tới phòng bạn.`
+            : "Trực KTX sẽ nhận việc trong ít phút."
         }
       />
     </div>
