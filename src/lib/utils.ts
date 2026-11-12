@@ -37,6 +37,20 @@ export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export const KTX_AREAS = ["B1", "B2", "C1"] as const;
+
+export function splitRoomCode(value: string): { area: string; room: string } {
+  const match = value.trim().toUpperCase().match(/^([A-Z]\d+)-(.+)$/);
+  if (match) return { area: match[1], room: match[2] };
+  return { area: "", room: value.trim() };
+}
+
+export function roomLabel(value: string) {
+  const { area, room } = splitRoomCode(value);
+  if (!value) return "";
+  return area ? `Tòa ${area} · Phòng ${room}` : `Phòng ${room}`;
+}
+
 export function roleHome(role: "resident" | "staff" | "vendor" | "admin") {
   if (role === "staff") return "/dashboard";
   if (role === "vendor") return "/kitchen";
