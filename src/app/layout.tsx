@@ -9,14 +9,14 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Dorm Utility — Tiện ích Ký túc xá",
+  title: "Tiện ích KTX",
   description:
     "Đổi bình nước 20L và đặt cơm trưa trước 1 ngày cho sinh viên ký túc xá.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Dorm Utility",
+    title: "Tiện ích KTX",
   },
 };
 
