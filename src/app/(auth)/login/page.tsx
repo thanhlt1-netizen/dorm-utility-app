@@ -23,7 +23,7 @@ import {
   signUpWithProfile,
   verifySignupOtp,
 } from "@/lib/supabase/auth";
-import { cn, roleHome } from "@/lib/utils";
+import { cn, KTX_AREAS, roleHome } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { ROLE_LABEL, type Role, type User } from "@/types";
 
@@ -48,6 +48,7 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
+  const [area, setArea] = useState<string>("B1");
   const [studentId, setStudentId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -187,7 +188,7 @@ export default function LoginPage() {
         const result = await signUpWithProfile(trimmedEmail, password, {
           fullName: fullName.trim(),
           phone: phone.trim(),
-          roomNumber: roomNumber.trim(),
+          roomNumber: `${area}-${roomNumber.trim().toUpperCase()}`,
           studentId: studentId.trim(),
         });
         if (result.needsEmailConfirmation) {
@@ -296,7 +297,7 @@ export default function LoginPage() {
         <div className="flex size-16 items-center justify-center rounded-3xl bg-gradient-to-br from-sky-500 to-sky-700 shadow-lg shadow-sky-600/30">
           <Droplets className="size-8 text-white" />
         </div>
-        <h1 className="mt-4 text-2xl font-extrabold tracking-tight">Dorm Utility</h1>
+        <h1 className="text-gradient mt-4 text-2xl font-extrabold tracking-tight">Tiện ích KTX</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Đổi nước 20L · Đặt cơm trưa · Ký túc xá
         </p>
@@ -488,11 +489,45 @@ export default function LoginPage() {
                     placeholder="Họ và tên"
                     autoComplete="name"
                   />
+                  <div>
+                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                      Tòa ký túc xá
+                    </p>
+                    <div className="grid grid-cols-3 gap-1.5 rounded-2xl bg-muted/60 p-1">
+                      {KTX_AREAS.map((a) => {
+                        const active = area === a;
+                        return (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() => setArea(a)}
+                            className="relative min-h-10 rounded-xl text-sm font-semibold"
+                          >
+                            {active && (
+                              <motion.span
+                                layoutId="signup-area"
+                                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                                className="absolute inset-0 rounded-xl bg-background shadow-sm"
+                              />
+                            )}
+                            <span
+                              className={cn(
+                                "relative transition-colors",
+                                active ? "text-foreground" : "text-muted-foreground"
+                              )}
+                            >
+                              Tòa {a}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   <div className="flex gap-2.5">
                     <Input
                       value={roomNumber}
                       onChange={(e) => setRoomNumber(e.target.value.toUpperCase())}
-                      placeholder="Số phòng (VD: B304)"
+                      placeholder="Số phòng (VD: 304)"
                       className="w-36"
                     />
                     <Input
