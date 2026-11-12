@@ -50,32 +50,36 @@ export default function HomePage() {
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 320, damping: 28 }}
-        className="flex items-center justify-between"
+        className="glass flex items-center justify-between rounded-3xl border border-border/60 p-4 shadow-[0_8px_30px_-16px_rgba(2,8,23,0.3)]"
       >
         <div>
-          <p className="text-sm text-muted-foreground">
-            Chào {currentUser.fullName.split(" ").slice(-1).join(" ")} 👋
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Ký túc xá · Phòng {currentUser.roomNumber}
           </p>
-          <h1 className="text-xl font-bold tracking-tight">
-            Phòng {currentUser.roomNumber}
+          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight">
+            Chào{" "}
+            <span className="text-gradient">
+              {currentUser.fullName.split(" ").slice(-1).join(" ")}
+            </span>{" "}
+            👋
           </h1>
         </div>
         <div className="flex items-center gap-1">
           <motion.button
             whileTap={{ scale: 0.88 }}
             onClick={toggle}
-            className="flex size-10 items-center justify-center rounded-full hover:bg-muted"
+            className="flex size-10 items-center justify-center rounded-full bg-muted/60 transition-colors hover:bg-muted"
             aria-label="Đổi giao diện sáng/tối"
           >
             {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.88 }}
-            className="relative flex size-10 items-center justify-center rounded-full hover:bg-muted"
+            className="relative flex size-10 items-center justify-center rounded-full bg-muted/60 transition-colors hover:bg-muted"
             aria-label="Thông báo"
           >
             <Bell className="size-5" />
-            <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-sky-600" />
+            <span className="absolute right-2.5 top-2.5 size-2 animate-pulse rounded-full bg-sky-600 ring-2 ring-card" />
           </motion.button>
         </div>
       </motion.header>
@@ -132,7 +136,7 @@ export default function HomePage() {
             subtitle="Bình 20L · giao tận phòng"
             icon={Droplets}
             gradient="from-sky-500/20 to-sky-500/5"
-            iconBg="bg-sky-600 shadow-sky-600/30"
+            iconBg="from-sky-400 to-sky-600 shadow-sky-600/30"
             delay={0}
           />
           <ServiceCard
@@ -141,7 +145,7 @@ export default function HomePage() {
             subtitle="Đặt hôm nay · nhận trưa mai"
             icon={UtensilsCrossed}
             gradient="from-emerald-500/20 to-emerald-500/5"
-            iconBg="bg-emerald-600 shadow-emerald-600/30"
+            iconBg="from-emerald-400 to-emerald-600 shadow-emerald-600/30"
             delay={0.08}
           />
         </div>
@@ -188,7 +192,7 @@ export default function HomePage() {
 function ActiveOrderCard({ order }: { order: import("@/types").Order }) {
   return (
     <Link href={`/orders/${order.id}`}>
-      <Card className="mb-2.5 p-4 transition-shadow active:shadow-md">
+      <Card className="card-elevated mb-2.5 p-4 transition-transform active:scale-[0.985]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div
@@ -249,24 +253,30 @@ function ServiceCard({
       <Link href={href} className="block">
         <motion.div
           whileTap={{ scale: 0.96 }}
-          whileHover={{ y: -2 }}
+          whileHover={{ y: -3 }}
           transition={{ type: "spring", stiffness: 400, damping: 24 }}
           className={cn(
-            "relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br p-4",
+            "card-elevated relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br p-4",
             gradient
           )}
         >
           <div
+            aria-hidden
+            className="pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-white/25 blur-2xl dark:bg-white/5"
+          />
+          <div
             className={cn(
-              "flex size-11 items-center justify-center rounded-2xl text-white shadow-lg",
+              "flex size-12 items-center justify-center rounded-2xl bg-gradient-to-b text-white shadow-lg ring-1 ring-inset ring-white/25",
               iconBg
             )}
           >
-            <Icon className="size-5" />
+            <Icon className="size-5.5" strokeWidth={2.2} />
           </div>
-          <p className="mt-3 font-bold">{title}</p>
+          <p className="mt-3.5 font-bold tracking-tight">{title}</p>
           <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{subtitle}</p>
-          <ArrowUpRight className="absolute right-3 top-3 size-4 text-muted-foreground/60" />
+          <span className="absolute right-3 top-3 flex size-7 items-center justify-center rounded-full bg-card/70 shadow-sm ring-1 ring-inset ring-border/60">
+            <ArrowUpRight className="size-3.5 text-muted-foreground" />
+          </span>
         </motion.div>
       </Link>
     </motion.div>
@@ -276,7 +286,7 @@ function ServiceCard({
 function RecentOrderRow({ order }: { order: import("@/types").Order }) {
   return (
     <Link href={`/orders/${order.id}`}>
-      <Card className="flex items-center justify-between gap-3 px-4 py-3">
+      <Card className="card-elevated flex items-center justify-between gap-3 px-4 py-3 transition-transform active:scale-[0.985]">
         <div className="flex min-w-0 items-center gap-3">
           <div
             className={cn(
