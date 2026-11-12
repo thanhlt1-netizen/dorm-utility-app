@@ -24,6 +24,7 @@ import {
 } from "@/lib/payment";
 import { useMenus } from "@/hooks/use-menus";
 import { createFoodOrder, createFoodOrderUnpaid } from "@/lib/orders";
+import { createPayosCheckout } from "@/lib/payos-client";
 import { getSupabase } from "@/lib/supabase/client";
 import { cn, formatVND, sleep, tomorrowISO } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -34,6 +35,7 @@ type Phase = "idle" | "loading" | "success";
 
 const vnpayEnabled = process.env.NEXT_PUBLIC_VNPAY_ENABLED === "true";
 const cassoEnabled = process.env.NEXT_PUBLIC_CASSO_ENABLED === "true";
+const payosEnabled = process.env.NEXT_PUBLIC_PAYOS_ENABLED === "true";
 
 export default function FoodPage() {
   const router = useRouter();
@@ -55,6 +57,7 @@ export default function FoodPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [vnpayBusy, setVnpayBusy] = useState(false);
+  const [payosBusy, setPayosBusy] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [creatingPending, setCreatingPending] = useState(false);
   const [pickupCode, setPickupCode] = useState("");
@@ -193,6 +196,35 @@ export default function FoodPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Thanh toán VNPay thất bại.");
       setVnpayBusy(false);
+    }
+  }
+
+  async function handlePayosPayment() {
+    if (payosBusy || selectedItems.length === 0) return;
+    setPayosBusy(true);
+    setError(null);
+
+    try {
+      let code = pendingOrder?.code;
+      if (!code) {
+        const order = await createFoodOrderUnpaid({
+          items: selectedItems.map((x) => ({
+            menuId: x.menu.id,
+            dishName: x.menu.dishName,
+            price: x.menu.price,
+            quantity: x.qty,
+          })),
+          totalAmount,
+        });
+        addOrder(order);
+        setPendingOrder(order);
+        code = order.code;
+      }
+      const checkoutUrl = await createPayosCheckout(code);
+      window.location.href = checkoutUrl;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không tạo được lệnh thanh toán PayOS.");
+      setPayosBusy(false);
     }
   }
 
@@ -364,7 +396,7 @@ export default function FoodPage() {
                 </h2>
               </div>
 
-              {cassoEnabled && !pendingOrder ? (
+              {cassoEnabled && !payosEnabled && !pendingOrder ? (
                 <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-muted/30 p-5 text-center">
                   <p className="text-sm text-muted-foreground">
                     {totalQty} suất · nhận trưa mai tại điểm tụ
@@ -417,6 +449,27 @@ export default function FoodPage() {
                 </div>
               )}
 
+              {payosEnabled && (
+                <div className="mt-4">
+                  <TapButton
+                    onClick={handlePayosPayment}
+                    disabled={phase !== "idle" || payosBusy}
+                    className="w-full bg-sky-600 shadow-sky-600/30"
+                  >
+                    {payosBusy ? (
+                      <Loader2 className="size-5 animate-spin" />
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Wallet className="size-4" /> Thanh toán qua PayOS
+                      </span>
+                    )}
+                  </TapButton>
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                    Quét QR ngân hàng bất kỳ — hệ thống tự xác nhận qua PayOS.
+                  </p>
+                </div>
+              )}
+
               {error && (
                 <motion.p
                   initial={{ opacity: 0 }}
@@ -427,7 +480,7 @@ export default function FoodPage() {
                 </motion.p>
               )}
 
-              {vnpayEnabled && !cassoEnabled && (
+              {vnpayEnabled && !cassoEnabled && !payosEnabled && (
                 <div className="mt-4">
                   <TapButton
                     onClick={handleVnpayPayment}
@@ -448,7 +501,7 @@ export default function FoodPage() {
                 </div>
               )}
 
-              {cassoEnabled ? (
+              {cassoEnabled && !payosEnabled ? (
                 <div className="mt-4">
                   {!pendingOrder ? (
                     <TapButton
