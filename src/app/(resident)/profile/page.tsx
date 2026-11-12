@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/hooks/use-theme";
 import { getSupabase } from "@/lib/supabase/client";
+import { roomLabel } from "@/lib/utils";
 import { signOutSupabase } from "@/lib/supabase/auth";
 import { useAuthStore } from "@/stores/auth-store";
 import { ROLE_LABEL } from "@/types";
@@ -83,7 +84,7 @@ export default function ProfilePage() {
   }
 
   const roleLine = [
-    ...(currentUser.roomNumber ? [`Phòng ${currentUser.roomNumber}`] : []),
+    ...(currentUser.roomNumber ? [roomLabel(currentUser.roomNumber)] : []),
     ROLE_LABEL[currentUser.role],
   ].join(" · ");
 
@@ -223,7 +224,7 @@ export default function ProfilePage() {
         </TapButton>
 
         <p className="pt-2 text-center text-xs text-muted-foreground">
-          Dorm Utility · phiên bản 1.0.0 · Supabase
+          Tiện ích KTX · phiên bản 1.0.0
         </p>
       </div>
     </div>
