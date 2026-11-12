@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Banknote, Check, Loader2, Minus, Plus, QrCode } from "lucide-react";
+import { Banknote, Check, Loader2, Minus, Plus, QrCode, Wallet } from "lucide-react";
 import { SuccessOverlay } from "@/components/animated/success-overlay";
 import { TapButton } from "@/components/animated/tap-button";
 import { ScreenHeader } from "@/components/shared/screen-header";
@@ -19,6 +19,7 @@ import {
   createWaterOrder,
   setOrderPaymentMethod,
 } from "@/lib/orders";
+import { createPayosCheckout } from "@/lib/payos-client";
 import { cn, formatVND, sleep } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
@@ -26,6 +27,7 @@ import type { Order } from "@/types";
 
 const SERVICE_FEE_PER_BOTTLE = 20000;
 const cassoEnabled = process.env.NEXT_PUBLIC_CASSO_ENABLED === "true";
+const payosEnabled = process.env.NEXT_PUBLIC_PAYOS_ENABLED === "true";
 
 type Phase = "idle" | "loading" | "success";
 type PayMethod = "cash" | "qr";
@@ -44,6 +46,7 @@ export default function WaterPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [payosBusy, setPayosBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const total = bottleCount * SERVICE_FEE_PER_BOTTLE;
@@ -120,6 +123,20 @@ export default function WaterPage() {
       setError(e instanceof Error ? e.message : "Xác nhận thanh toán thất bại.");
     } finally {
       setConfirming(false);
+    }
+  }
+
+  async function handlePayosPayment() {
+    if (payosBusy || !pendingOrder) return;
+    setPayosBusy(true);
+    setError(null);
+
+    try {
+      const checkoutUrl = await createPayosCheckout(pendingOrder.code);
+      window.location.href = checkoutUrl;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không tạo được lệnh thanh toán PayOS.");
+      setPayosBusy(false);
     }
   }
 
@@ -411,6 +428,27 @@ export default function WaterPage() {
                 )}
               </div>
 
+              {payosEnabled && (
+                <div className="mt-4">
+                  <TapButton
+                    onClick={handlePayosPayment}
+                    disabled={phase !== "idle" || payosBusy}
+                    className="w-full bg-sky-600 shadow-sky-600/30"
+                  >
+                    {payosBusy ? (
+                      <Loader2 className="size-5 animate-spin" />
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Wallet className="size-4" /> Thanh toán qua PayOS
+                      </span>
+                    )}
+                  </TapButton>
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                    Quét QR ngân hàng bất kỳ — hệ thống tự xác nhận qua PayOS.
+                  </p>
+                </div>
+              )}
+
               {error && (
                 <motion.p
                   initial={{ opacity: 0 }}
@@ -421,7 +459,7 @@ export default function WaterPage() {
                 </motion.p>
               )}
 
-              {cassoEnabled ? (
+              {cassoEnabled && !payosEnabled ? (
                 <div className="mt-4">
                   <TapButton
                     onClick={() => {
