@@ -1,60 +1,77 @@
-# Dorm Utility App — Tiện ích Ký túc xá
+# Dorm Utility App · Tiện ích Ký túc xá
 
-PWA mobile-first cho sinh viên ký túc xá: **Đổi nước 20L** và **Đặt cơm trưa** (đặt hôm nay → nhận trưa mai), thanh toán online tự xác nhận, lấy đồ tại điểm tụ bằng mã đơn.
-
-Stack: Next.js 15 (App Router) + TypeScript · Tailwind CSS + shadcn/ui · Framer Motion · Supabase (DB/Auth/Realtime/RPC) · Zustand + TanStack Query · PWA · Vercel.
-
-## Tính năng
+Web app mobile-first (PWA) cho sinh viên ký túc xá với 2 dịch vụ:
 
 - **Đổi nước 20L** — sinh viên tạo yêu cầu (tối đa 2 bình/lần, 1 yêu cầu/ngày), huỷ được trước khi tiếp nhận; ban quản lý/sinh viên trực ca nhận và giao; thanh toán tiền mặt khi nhận nước hoặc chuyển khoản QR (tự xác nhận qua Casso).
-- **Đặt cơm trưa** — nhà bếp cập nhật món theo ngày; sinh viên chọn suất → thanh toán (PayOS/VNPay/Casso/VietQR) → nhận mã 6 số để lấy đồ tại điểm tụ trưa mai.
-- **Đăng ký sinh viên bằng OTP** — mã 6 số gửi qua email, kích hoạt và vào app luôn.
-- **4 vai trò**: Sinh viên (tự đăng ký), Trực KTX, Nhà bếp, Quản lý KTX (tài khoản admin cấp).
-- Realtime qua Supabase channel `orders-realtime`; skeleton loading, optimistic UI, page transition, success animation, dark mode.
+- **Đặt cơm trưa** — đặt chiều nay, nhận trưa mai; thanh toán VietQR, lấy đồ tại điểm tụ bằng mã 6 số.
+
+App chạy **production thật**: mọi dữ liệu ghi/đọc trực tiếp Supabase (PostgreSQL + RLS + RPC), không còn dữ liệu mẫu.
+
+## Tech stack
+
+- Next.js 15 (App Router) + TypeScript
+- Tailwind CSS v4 + shadcn/ui-style components
+- Framer Motion (spring physics, `layoutId`, `AnimatePresence`)
+- Supabase (DB + Auth + Realtime + RPC) — **bắt buộc**
+- Zustand + TanStack Query
+- PWA (manifest, Add to Home Screen)
+- Deploy: Vercel
 
 ## Chạy dự án
 
 ```bash
 pnpm install
-cp .env.example .env.local   # điền env Supabase
 pnpm dev
 ```
 
-Mở [http://localhost:3000](http://localhost:3000).
+Mở `http://localhost:3000`, bật Device Toolbar (F12 → mobile) để xem đúng khung 430px.
 
-## Setup Supabase
+Build production: `pnpm build && pnpm start`.
 
-1. Tạo project tại [supabase.com](https://supabase.com) (free tier đủ dùng).
-2. Chạy [`supabase/schema.sql`](supabase/schema.sql) trong SQL Editor, rồi các migration theo thứ tự: [`migration-001-otp.sql`](supabase/migration-001-otp.sql), [`migration-002-vnpay.sql`](supabase/migration-002-vnpay.sql) (RPC `create_food_order_unpaid`), [`migration-003-water-qr.sql`](supabase/migration-003-water-qr.sql) (RPC `confirm_payment_self`), [`migration-004-payment-method.sql`](supabase/migration-004-payment-method.sql) (RPC `set_order_payment_method`), [`migration-005-water-cancel.sql`](supabase/migration-005-water-cancel.sql) (RPC `cancel_water_order_self` + chống spam).
-3. Điền `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` vào Vercel (Production).
+## Thiết lập Supabase (bắt buộc)
 
-## Thanh toán PayOS (khuyến nghị)
+1. Tạo project tại [supabase.com](https://supabase.com).
+2. Mở **SQL Editor**, dán và chạy toàn bộ [`supabase/schema.sql`](supabase/schema.sql) — tạo 5 bảng (`users`, `orders`, `water_order_details`, `daily_menus`, `food_order_details`), enums, trigger `updated_at`, trigger tự tạo profile khi signup, 3 RPC (`create_water_order`, `create_food_order`, `complete_pickup`), RLS policies, realtime publication và seed thực đơn ngày mai. Sau đó chạy tiếp [`supabase/migration-004-payment-method.sql`](supabase/migration-004-payment-method.sql) (RPC `set_order_payment_method` — đổi hình thức thanh toán tiền mặt ⇄ chuyển khoản QR khi đơn còn chờ tiếp nhận) và [`supabase/migration-005-water-limits.sql`](supabase/migration-005-water-limits.sql) (RPC `cancel_water_order_self` + giới hạn 2 bình/lần, 1 yêu cầu/ngày).
+3. **Authentication → Providers**: bật Email. Giữ "Confirm email" và đổi template **Confirm Signup** (Authentication → Emails) dùng `{{ .Token }}` thay cho `{{ .ConfirmationURL }}` — sinh viên sẽ nhận **mã OTP 6 số** và nhập trực tiếp trong app (hoặc tắt "Confirm email" để vào dùng luôn).
+4. Tạo tài khoản **staff / vendor / admin** trong **Authentication → Users** (app tự tạo row `users` qua trigger với role mặc định `resident`), rồi nâng quyền trong SQL Editor:
 
-Cổng thanh toán QR qua [PayOS](https://payos.vn) (hỗ trợ VietQR mọi ngân hàng + thẻ): sinh viên quét QR ngân hàng bất kỳ, PayOS webhook tự xác nhận realtime — không cần merchant ngân hàng riêng.
-
-1. Đăng ký [my.payos.vn](https://my.payos.vn), tạo **Kênh thanh toán** → vào **API credentials** lấy Client ID, API Key, Checksum Key.
-2. Đăng ký **Webhook** với URL `https://<domain>/api/payment/payos/webhook` trong dashboard PayOS (PayOS gửi ping xác nhận — app trả 200 sẵn sàng).
-3. Thêm env vars vào `.env.local` và Vercel:
-
-```
-NEXT_PUBLIC_PAYOS_ENABLED=true
-PAYOS_CLIENT_ID=xxxx
-PAYOS_API_KEY=xxxx
-PAYOS_CHECKSUM_KEY=xxxx
+```sql
+update public.users set role = 'staff'  where id = '<uuid>';
+update public.users set role = 'vendor' where id = '<uuid>';
+update public.users set role = 'admin'  where id = '<uuid>';
 ```
 
-Luồng: bấm "Thanh toán qua PayOS" → tạo lệnh (đơn `unpaid` giữ suất, hạn 15 phút) → redirect trang PayOS → quét QR → PayOS webhook (verify chữ ký HMAC-SHA256, đối chiếu mã đơn + số tiền) → đơn `paid` + realtime cập nhật. Khi bật PayOS, nút PayOS là kênh chính trên cả đơn cơm và đơn nước; Casso/VietQR thủ công vẫn là phương án dự phòng (tắt bằng cách bỏ `NEXT_PUBLIC_CASSO_ENABLED`).
+5. Copy `.env.example` → `.env.local` và điền:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+```
+
+6. Trên Vercel: thêm cùng 2 biến vào **Settings → Environment Variables** rồi redeploy.
+
+Chưa cấu hình env? App hiển thị màn hình **Setup** kèm hướng dẫn từng bước thay vì chạy demo.
 
 ## Thanh toán VNPay QR (tuỳ chọn)
 
-Đăng ký sandbox tại [sandbox.vnpayment.vn/devreg](https://sandbox.vnpayment.vn/devreg/):
+Mặc định trang đặt cơm dùng VietQR + xác nhận thủ công. Khi cấu hình VNPay, sinh viên sẽ thanh toán qua cổng VNPay bằng QR ngân hàng bất kỳ và hệ thống **tự động xác nhận** qua IPN.
+
+1. Đăng ký merchant sandbox tại [sandbox.vnpayment.vn/devreg](https://sandbox.vnpayment.vn/devreg/) để nhận `vnp_TmnCode` + `vnp_HashSecret` (miễn phí, production cần hợp đồng với VNPay).
+2. Chạy thêm [`supabase/migration-002-vnpay.sql`](supabase/migration-002-vnpay.sql) (RPC `create_food_order_unpaid`) và [`supabase/migration-003-water-qr.sql`](supabase/migration-003-water-qr.sql) (RPC `confirm_payment_self` — xác nhận chuyển khoản đơn nước/cơm khi chưa nối Casso) trong SQL Editor.
+3. Lấy `service_role` key ở Supabase → **Settings → API**.
+4. Thêm env vars vào `.env.local` và Vercel:
 
 ```
 NEXT_PUBLIC_VNPAY_ENABLED=true
 VNPAY_TMN_CODE=xxxx
 VNPAY_HASH_SECRET=xxxx
-VNPAY_ENV=sandbox
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+# VNPAY_ENV=production   # chỉ bật khi có thông số merchant thật
 ```
+
+5. Trong dashboard VNPay, khai báo:
+   - **Return URL**: `https://<domain>/api/payment/vnpay/return`
+   - **IPN URL**: `https://<domain>/api/payment/vnpay/ipn`
 
 Luồng: tạo đơn `unpaid` (giữ suất) → redirect sang VNPay → sinh viên quét QR → VNPay gọi IPN (ký HMAC-SHA512, đối chiếu số tiền) → đơn chuyển `paid` + realtime cập nhật. Đơn không thanh toán trong 15 phút có thể huỷ thủ công bởi vendor/admin.
 
@@ -73,6 +90,23 @@ CASSO_SECURE_TOKEN=xxxx
 
 Luồng: bấm "Tạo lệnh thanh toán" → đơn `unpaid` giữ suất + QR kèm mã đơn → sinh viên chuyển khoản → Casso webhook (verify token, đối chiếu mã đơn + số tiền) → đơn `paid` + realtime cập nhật. Chưa bật Casso/VNPay thì dùng xác nhận thủ công như cũ.
 
+## Thanh toán PayOS (khuyến nghị)
+
+Cổng thanh toán QR qua [PayOS](https://payos.vn) (hỗ trợ VietQR mọi ngân hàng + thẻ): sinh viên quét QR ngân hàng bất kỳ, PayOS webhook tự xác nhận realtime — không cần merchant ngân hàng riêng.
+
+1. Đăng ký [my.payos.vn](https://my.payos.vn), tạo **Kênh thanh toán** → vào **API credentials** lấy Client ID, API Key, Checksum Key.
+2. Đăng ký **Webhook** với URL `https://<domain>/api/payment/payos/webhook` trong dashboard PayOS (PayOS gửi ping xác nhận — app trả 200 sẵn sàng).
+3. Thêm env vars vào `.env.local` và Vercel:
+
+```
+NEXT_PUBLIC_PAYOS_ENABLED=true
+PAYOS_CLIENT_ID=xxxx
+PAYOS_API_KEY=xxxx
+PAYOS_CHECKSUM_KEY=xxxx
+```
+
+Luồng: bấm "Thanh toán qua PayOS" → tạo lệnh (đơn `unpaid` giữ suất, hạn 15 phút) → redirect trang PayOS → quét QR → PayOS webhook (verify chữ ký HMAC-SHA256, đối chiếu mã đơn + số tiền) → đơn `paid` + realtime cập nhật. Khi bật PayOS, nút PayOS là kênh chính trên cả đơn cơm và đơn nước; Casso/VietQR thủ công vẫn là phương án dự phòng (tắt bằng cách bỏ `NEXT_PUBLIC_CASSO_ENABLED`).
+
 ## Đăng nhập theo vai trò
 
 Trang `/login` có 4 tab vai trò:
@@ -82,38 +116,56 @@ Trang `/login` có 4 tab vai trò:
 
 Đơn hàng cập nhật realtime qua channel `orders-realtime`; tạo đơn nước/cơm và xác nhận mã lấy đồ đi qua RPC `security definer` để chống gian lận (trừ kho nguyên tử, kiểm tra quyền ở server).
 
-## Tạo tài khoản quản lý
+Đơn nước đang **chờ tiếp nhận** có thể đổi hình thức thanh toán (tiền mặt ⇄ chuyển khoản QR) ngay tại trang chi tiết đơn; đơn cơm luôn thanh toán online trước để nhà bếp nhìn thấy.
 
-Tài khoản staff/vendor/admin được cấp sẵn qua [`supabase/create-accounts.sql`](supabase/create-accounts.sql):
+## Tạo tài khoản quản lý (staff / vendor / admin)
 
-1. Tạo 9 user trong Supabase Dashboard (Authentication → Users → Add user, bật **Auto Confirm User**): `nv1@ktx.vn` … `nv4@ktx.vn`, `vd1@ktx.vn` … `vd4@ktx.vn`, `admin@ktx.vn`.
-2. Chạy `create-accounts.sql` trong SQL Editor — script gán `full_name` + `role` tương ứng.
+Tài khoản quản lý **không tự đăng kí được** — tạo theo 2 bước (script sẵn: `supabase/create-accounts.sql`):
 
-| Tài khoản | Email | Mật khẩu | Vai trò | Tên hiển thị |
-| --- | --- | --- | --- | --- |
-| `nv1`–`nv4` | `nv1@ktx.vn`… | `nvktxbc1`–`nvktxbc4` | staff | Trực KTX 1–4 |
-| `vd1`–`vd4` | `vd1@ktx.vn`… | `vdnhaan1`–`vdnhaan4` | vendor | Nhà bếp 1–4 |
-| `admin` | `admin@ktx.vn` | `admin123` | admin | Quản lý KTX |
+1. **Dashboard**: Authentication → Users → Add user → Create new user, nhập email + mật khẩu, bật **Auto Confirm User**. Lặp lại cho đủ 9 tài khoản:
 
-Đăng nhập: nhập tên (vd `nv1`) — app tự thêm `@ktx.vn` — hoặc email đầy đủ. Mỗi tài khoản đổi mật khẩu ngay tại trang **Cá nhân** (card "Đổi mật khẩu", tối thiểu 6 ký tự) — nên đổi ngay khi nhận tài khoản.
+   | Tài khoản | Email | Mật khẩu | Vai trò | Tên hiển thị |
+   |---|---|---|---|---|
+   | nv1 | nv1@ktx.vn | nvktxbc1 | Trực KTX | Trực KTX 1 |
+   | nv2 | nv2@ktx.vn | nvktxbc2 | Trực KTX | Trực KTX 2 |
+   | nv3 | nv3@ktx.vn | nvktxbc3 | Trực KTX | Trực KTX 3 |
+   | nv4 | nv4@ktx.vn | nvktxbc4 | Trực KTX | Trực KTX 4 |
+   | vd1 | vd1@ktx.vn | vdnhaan1 | Nhà bếp | Nhà bếp 1 |
+   | vd2 | vd2@ktx.vn | vdnhaan2 | Nhà bếp | Nhà bếp 2 |
+   | vd3 | vd3@ktx.vn | vdnhaan3 | Nhà bếp | Nhà bếp 3 |
+   | vd4 | vd4@ktx.vn | vdnhaan4 | Nhà bếp | Nhà bếp 4 |
+   | admin | admin@ktx.vn | admin123 | Quản lý KTX | Quản lý KTX |
 
-## PWA
+2. **SQL Editor**: chạy nguyên file `supabase/create-accounts.sql` — script tự gán `full_name` + `role` cho cả 9 user theo email, báo `OK` / `CHƯA CÓ` cho từng tài khoản. Chạy lại nhiều lần không sao.
 
-Manifest + meta đủ để **Add to Home Screen** trên iOS/Android; chạy qua HTTPS (Vercel) là cài đặt được.
+Cách đăng nhập trong app:
+
+- Chọn tab vai trò tương ứng, nhập **tên tài khoản** (vd `nv1`) — app tự thêm `@ktx.vn`; nhập email đầy đủ cũng được.
+- Mật khẩu tối thiểu 6 ký tự nên admin dùng `admin123` thay cho `admin` (đổi lại được ngay trong app sau khi đăng nhập).
+
+Đổi mật khẩu tự chủ: mọi vai trò vào **Cá nhân → Đổi mật khẩu** (staff / vendor bấm icon người ở góc phải màn hình chính). Mật khẩu mới tối thiểu 6 ký tự.
+
+Lưu ý:
+
+- Quyền được đọc từ bảng `public.users` ở server (`current_app_role()`), nên bắt buộc update đúng bảng này — không phải bảng auth.
+- Nếu user đã đăng nhập trước khi nâng quyền, cần **đăng xuất rồi đăng nhập lại** để app nạp quyền mới.
 
 ## Cấu trúc
 
 ```
 src/
 ├── app/
-│   ├── (auth)/login/
-│   ├── (resident)/        # home, water, food, orders, profile
-│   ├── (staff)/dashboard/ # trực ca: nhận/giao nước
-│   ├── (vendor)/kitchen/  # nhà bếp: thực đơn + đơn cơm
-│   ├── (admin)/admin/     # tổng quan
-│   └── api/payment/       # vnpay (create/ipn/return), casso webhook, payos (create/webhook)
-├── components/            # ui/, shared/, animated/ (Framer Motion)
-├── hooks/  stores/  lib/  types/
+│   ├── (auth)/login        # Đăng nhập / đăng kí 4 vai trò + màn hình setup
+│   ├── (resident)/         # Home, water, food, orders (+ orders/[id] chi tiết), profile
+│   ├── (staff)/dashboard   # Trực ca đổi nước
+│   ├── (vendor)/kitchen    # Nhà bếp: đơn hàng + thực đơn
+│   ├── api/payment/vnpay   # create / return / ipn (thanh toán VNPay QR)
+│   └── api/webhook/payment
+├── components/{ui,shared,animated}
+├── lib/{supabase,payment.ts,utils.ts,orders.ts,menus.ts,vnpay.ts}
+├── hooks/                  # use-theme, use-auth-session, use-orders, use-menus, use-realtime-orders
+├── stores/                 # auth, orders, menus (Zustand)
+└── types/
 ```
 
 ## Roadmap
@@ -129,9 +181,9 @@ src/
 - [x] Lịch sử đơn + chi tiết đơn với Timeline trạng thái
 - [x] Staff dashboard + Vendor kitchen
 - [x] Vendor chỉnh thực đơn thật (thêm món, bật/tắt, chỉnh số suất)
-- [x] Đăng ký sinh viên xác nhận OTP 6 số qua email
 - [x] Supabase schema + RLS + Auth + Realtime + RPC production
 - [x] Thanh toán VNPay QR tự động xác nhận (sandbox/production)
+- [x] Xác thực đăng kí bằng mã OTP 6 số qua email
 - [x] Tài khoản cố định nv1–nv4 / vd1–vd4 / admin + đổi mật khẩu tự chủ
 - [ ] Confetti + toast system
 - [ ] Service Worker offline đầy đủ
