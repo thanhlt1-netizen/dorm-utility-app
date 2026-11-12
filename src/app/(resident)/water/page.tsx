@@ -261,9 +261,11 @@ export default function WaterPage() {
             <p className="mt-2.5 text-xs text-muted-foreground">
               {payMethod === "cash"
                 ? "Trả tiền mặt cho người giao nước tại phòng."
-                : cassoEnabled
-                  ? "Quét QR chuyển khoản — hệ thống tự xác nhận khi tiền về."
-                  : "Quét QR chuyển khoản rồi bấm xác nhận."}
+                : payosEnabled
+                  ? "Quét QR ngân hàng bất kỳ qua PayOS — hệ thống tự xác nhận khi tiền về."
+                  : cassoEnabled
+                    ? "Quét QR chuyển khoản — hệ thống tự xác nhận khi tiền về."
+                    : "Quét QR chuyển khoản rồi bấm xác nhận."}
             </p>
           </Card>
         </motion.div>
@@ -399,34 +401,54 @@ export default function WaterPage() {
                 <h2 className="text-lg font-bold">Thanh toán chuyển khoản</h2>
               </div>
 
-              <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-muted/30 p-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={buildVietQRUrl(pendingOrder.code, pendingOrder.totalAmount)}
-                  alt="VietQR"
-                  className="size-48 rounded-xl bg-white p-2"
-                />
-                <div className="w-full space-y-1 text-center text-sm">
-                  <p className="font-medium">{BANK_INFO.bankName}</p>
-                  <p className="tabular-nums">{BANK_INFO.accountNumber}</p>
-                  <p className="text-muted-foreground">{BANK_INFO.accountName}</p>
-                  <p className="mt-2 font-semibold text-sky-600 dark:text-sky-400">
+              {payosEnabled ? (
+                <div className="flex flex-col items-center gap-2 rounded-2xl border border-sky-500/30 bg-sky-500/5 p-5 text-center">
+                  <Wallet className="size-6 text-sky-600 dark:text-sky-400" />
+                  <p className="text-sm text-muted-foreground">Số tiền cần thanh toán</p>
+                  <p className="text-2xl font-extrabold tabular-nums text-sky-600 dark:text-sky-400">
                     {formatVND(pendingOrder.totalAmount)}
                   </p>
+                  <p className="font-mono text-sm font-bold tracking-widest">{pendingOrder.code}</p>
                   <p className="text-xs text-muted-foreground">
-                    Nội dung: {buildTransferContent(currentUser.roomNumber, pendingOrder.code)}
+                    Bấm &quot;Thanh toán qua PayOS&quot; để quét QR ngân hàng bất kỳ — hệ thống tự xác nhận khi tiền về.
                   </p>
-                  <p className="font-mono text-sm font-bold tracking-widest">
-                    {pendingOrder.code}
-                  </p>
+                  {phase === "idle" && (
+                    <div className="flex items-center gap-2 text-xs text-sky-600 dark:text-sky-400">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Đang chờ tiền về — tự động xác nhận trong ít phút...
+                    </div>
+                  )}
                 </div>
-                {cassoEnabled && phase === "idle" && (
-                  <div className="flex items-center gap-2 text-xs text-sky-600 dark:text-sky-400">
-                    <Loader2 className="size-3.5 animate-spin" />
-                    Đang chờ tiền về — tự động xác nhận trong ít phút...
+              ) : (
+                <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-muted/30 p-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={buildVietQRUrl(pendingOrder.code, pendingOrder.totalAmount)}
+                    alt="VietQR"
+                    className="size-48 rounded-xl bg-white p-2"
+                  />
+                  <div className="w-full space-y-1 text-center text-sm">
+                    <p className="font-medium">{BANK_INFO.bankName}</p>
+                    <p className="tabular-nums">{BANK_INFO.accountNumber}</p>
+                    <p className="text-muted-foreground">{BANK_INFO.accountName}</p>
+                    <p className="mt-2 font-semibold text-sky-600 dark:text-sky-400">
+                      {formatVND(pendingOrder.totalAmount)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Nội dung: {buildTransferContent(currentUser.roomNumber, pendingOrder.code)}
+                    </p>
+                    <p className="font-mono text-sm font-bold tracking-widest">
+                      {pendingOrder.code}
+                    </p>
                   </div>
-                )}
-              </div>
+                  {cassoEnabled && phase === "idle" && (
+                    <div className="flex items-center gap-2 text-xs text-sky-600 dark:text-sky-400">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Đang chờ tiền về — tự động xác nhận trong ít phút...
+                    </div>
+                  )}
+                </div>
+              )}
 
               {payosEnabled && (
                 <div className="mt-4">
@@ -459,7 +481,7 @@ export default function WaterPage() {
                 </motion.p>
               )}
 
-              {cassoEnabled && !payosEnabled ? (
+              {cassoEnabled || payosEnabled ? (
                 <div className="mt-4">
                   <TapButton
                     onClick={() => {
