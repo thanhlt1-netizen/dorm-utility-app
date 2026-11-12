@@ -17,7 +17,7 @@ import { StatusBadge } from "@/components/animated/status-badge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchOrders } from "@/lib/orders";
-import { cn, formatDayLabel, formatTime, formatVND } from "@/lib/utils";
+import { cn, formatDayLabel, formatTime, formatVND, roomLabel } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
 import { useTheme } from "@/hooks/use-theme";
@@ -54,7 +54,7 @@ export default function HomePage() {
       >
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Ký túc xá · Phòng {currentUser.roomNumber}
+            {roomLabel(currentUser.roomNumber) || "Ký túc xá"}
           </p>
           <h1 className="mt-0.5 text-xl font-extrabold tracking-tight">
             Chào{" "}
