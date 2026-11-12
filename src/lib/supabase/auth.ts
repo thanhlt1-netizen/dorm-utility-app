@@ -57,29 +57,19 @@ export async function signUpWithProfile(
   password: string,
   meta: { fullName: string; phone: string; roomNumber: string; studentId: string }
 ): Promise<{ needsEmailConfirmation: boolean; user: User | null }> {
-  const supabase = getSupabase();
-  if (!supabase) throw new Error("Supabase chưa được cấu hình");
+  const normalizedEmail = email.trim().toLowerCase();
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: meta.fullName,
-        phone: meta.phone,
-        room_number: meta.roomNumber,
-        student_id: meta.studentId,
-        role: "resident",
-      },
-    },
+  const res = await fetch("/api/auth/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: normalizedEmail, password, ...meta }),
   });
-  if (error) throw error;
-
-  if (!data.session || !data.user) {
-    return { needsEmailConfirmation: true, user: null };
+  const json = (await res.json().catch(() => null)) as { error?: string } | null;
+  if (!res.ok) {
+    throw new Error(json?.error ?? "Đăng ký thất bại.");
   }
 
-  const user = await fetchProfile(data.user.id);
+  const user = await signInWithPassword(normalizedEmail, password);
   return { needsEmailConfirmation: false, user };
 }
 
