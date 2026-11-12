@@ -3,25 +3,33 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #f4f7fb;
+  --foreground: #0b1220;
   --card: #ffffff;
-  --card-foreground: #0f172a;
-  --muted: #e9eef5;
-  --muted-foreground: #64748b;
-  --border: rgba(148, 163, 184, 0.25);
+  --card-foreground: #0b1220;
+  --muted: #e8eef6;
+  --muted-foreground: #5b6b81;
+  --border: rgba(100, 116, 139, 0.18);
   --ring: #0284c7;
+  --glow-1: rgba(2, 132, 199, 0.09);
+  --glow-2: rgba(16, 185, 129, 0.07);
+  --glow-3: rgba(139, 92, 246, 0.05);
+  --shadow-color: 220 40% 40%;
 }
 
 .dark {
-  --background: #090d16;
-  --foreground: #f1f5f9;
-  --card: #111827;
-  --card-foreground: #f1f5f9;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --border: rgba(148, 163, 184, 0.15);
+  --background: #070b13;
+  --foreground: #eef2f8;
+  --card: #0d1420;
+  --card-foreground: #eef2f8;
+  --muted: #182132;
+  --muted-foreground: #8b9bb0;
+  --border: rgba(148, 163, 184, 0.14);
   --ring: #38bdf8;
+  --glow-1: rgba(56, 189, 248, 0.1);
+  --glow-2: rgba(52, 211, 153, 0.07);
+  --glow-3: rgba(167, 139, 250, 0.07);
+  --shadow-color: 220 60% 2%;
 }
 
 @theme inline {
@@ -40,15 +48,54 @@
   border-color: var(--border);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
 
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42rem 42rem at 115% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(38rem 38rem at -15% 25%, var(--glow-2), transparent 60%),
+    radial-gradient(30rem 30rem at 50% 115%, var(--glow-3), transparent 60%);
+}
+
+::selection {
+  background: rgba(2, 132, 199, 0.18);
+}
+
 ::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+.glass {
+  background: color-mix(in oklab, var(--card) 72%, transparent);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+}
+
+.text-gradient {
+  background: linear-gradient(120deg, #0284c7, #10b981);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.card-elevated {
+  box-shadow:
+    0 1px 2px hsl(var(--shadow-color) / 0.06),
+    0 8px 24px -12px hsl(var(--shadow-color) / 0.18);
 }
