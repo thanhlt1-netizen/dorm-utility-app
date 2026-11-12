@@ -196,7 +196,22 @@ export default function StaffDashboardPage() {
                         </p>
                       </div>
                     </div>
-                    <StatusBadge status={order.status} />
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <StatusBadge status={order.status} />
+                      {order.paymentStatus === "paid" ? (
+                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                          Đã thanh toán
+                        </span>
+                      ) : order.paymentMethod === "bank_transfer" ? (
+                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                          Chưa thanh toán
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          Tiền mặt
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {order.note && (
