@@ -33,6 +33,7 @@ import {
   confirmPaymentSelf,
   setOrderPaymentMethod,
 } from "@/lib/orders";
+import { createPayosCheckout } from "@/lib/payos-client";
 import {
   cn,
   formatDayLabel,
@@ -45,6 +46,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useOrdersStore } from "@/stores/orders-store";
 
 const cassoEnabled = process.env.NEXT_PUBLIC_CASSO_ENABLED === "true";
+const payosEnabled = process.env.NEXT_PUBLIC_PAYOS_ENABLED === "true";
 
 export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -54,6 +56,7 @@ export default function OrderDetailPage() {
 
   const [showPay, setShowPay] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [payosBusy, setPayosBusy] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
@@ -92,6 +95,20 @@ export default function OrderDetailPage() {
       setError(e instanceof Error ? e.message : "Xác nhận thanh toán thất bại.");
     } finally {
       setConfirming(false);
+    }
+  }
+
+  async function handlePayosPayment() {
+    if (payosBusy || !order) return;
+    setPayosBusy(true);
+    setError(null);
+
+    try {
+      const checkoutUrl = await createPayosCheckout(order.code);
+      window.location.href = checkoutUrl;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không tạo được lệnh thanh toán PayOS.");
+      setPayosBusy(false);
     }
   }
 
@@ -483,6 +500,27 @@ export default function OrderDetailPage() {
                 )}
               </div>
 
+              {payosEnabled && (
+                <div className="mt-4">
+                  <TapButton
+                    onClick={handlePayosPayment}
+                    disabled={phase !== "idle" || payosBusy}
+                    className="w-full bg-sky-600 shadow-sky-600/30"
+                  >
+                    {payosBusy ? (
+                      <Loader2 className="size-5 animate-spin" />
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Wallet className="size-4" /> Thanh toán qua PayOS
+                      </span>
+                    )}
+                  </TapButton>
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                    Quét QR ngân hàng bất kỳ — hệ thống tự xác nhận qua PayOS.
+                  </p>
+                </div>
+              )}
+
               {error && (
                 <motion.p
                   initial={{ opacity: 0 }}
@@ -493,7 +531,7 @@ export default function OrderDetailPage() {
                 </motion.p>
               )}
 
-              {cassoEnabled ? (
+              {cassoEnabled && !payosEnabled ? (
                 <div className="mt-4">
                   <TapButton
                     onClick={() => {
