@@ -143,15 +143,30 @@ export async function cancelWaterOrderSelf(code: string): Promise<Order> {
 export async function setOrderPaymentMethod(
   code: string,
   method: PaymentMethod
-): Promise<Order> {
+): Promise<{ code: string; paymentMethod: PaymentMethod }> {
   const supabase = requireSupabase();
-  const { data, error } = await supabase.rpc("set_order_payment_method", {
-    p_code: code,
-    p_method: method,
-  });
-  if (error) throw error;
+  const token = (await supabase.auth.getSession()).data.session?.access_token;
+  if (!token) throw new Error("Phiên đăng nhập hết hạn, hãy đăng nhập lại.");
 
-  return mapOrderRow(data as OrderRow);
+  const res = await fetch("/api/orders/set-method", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ code, method }),
+  });
+  const json = (await res.json().catch(() => null)) as
+    | { ok?: boolean; method?: string; error?: string }
+    | null;
+  if (!res.ok || !json?.ok) {
+    throw new Error(json?.error ?? "Đổi hình thức thanh toán thất bại.");
+  }
+
+  return {
+    code,
+    paymentMethod: (json.method as PaymentMethod | null) ?? method,
+  };
 }
 
 export async function createFoodOrder(input: {
