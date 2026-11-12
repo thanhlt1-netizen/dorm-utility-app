@@ -365,7 +365,7 @@ export default function OrderDetailPage() {
                 </TapButton>
                 {!cancelConfirm && !cancelling && (
                   <p className="mt-2 text-center text-xs text-muted-foreground">
-                    Chỉ huỷ được trước khi ban quản lý tiếp nhận.
+                    Chỉ huỷ được trước khi Trực KTX tiếp nhận.
                   </p>
                 )}
               </Card>
