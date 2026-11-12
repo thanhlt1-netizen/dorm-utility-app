@@ -1,6 +1,6 @@
 {
-  "name": "Dorm Utility — Tiện ích Ký túc xá",
-  "short_name": "Dorm Utility",
+  "name": "Tiện ích KTX",
+  "short_name": "Tiện ích KTX",
   "description": "Đổi bình nước 20L và đặt cơm trưa trước 1 ngày cho sinh viên ký túc xá.",
   "start_url": "/",
   "display": "standalone",
