@@ -392,11 +392,39 @@ export default function FoodPage() {
               <div className="mb-4 flex items-center gap-2">
                 <QrCode className="size-5 text-emerald-600" />
                 <h2 className="text-lg font-bold">
-                  {cassoEnabled ? "Thanh toán chuyển khoản" : "Thanh toán VietQR"}
+                  {payosEnabled
+                    ? "Thanh toán qua PayOS"
+                    : cassoEnabled
+                      ? "Thanh toán chuyển khoản"
+                      : "Thanh toán VietQR"}
                 </h2>
               </div>
 
-              {cassoEnabled && !payosEnabled && !pendingOrder ? (
+              {payosEnabled ? (
+                <div className="flex flex-col items-center gap-2 rounded-2xl border border-sky-500/30 bg-sky-500/5 p-5 text-center">
+                  <Wallet className="size-6 text-sky-600 dark:text-sky-400" />
+                  <p className="text-sm text-muted-foreground">
+                    {totalQty} suất · nhận trưa mai tại điểm tụ
+                  </p>
+                  <p className="text-2xl font-extrabold tabular-nums text-sky-600 dark:text-sky-400">
+                    {formatVND(pendingOrder?.totalAmount ?? totalAmount)}
+                  </p>
+                  {pendingOrder && (
+                    <p className="font-mono text-sm font-bold tracking-widest">
+                      {pendingOrder.code}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Bấm &quot;Thanh toán qua PayOS&quot; để quét QR ngân hàng bất kỳ — hệ thống tự xác nhận khi tiền về.
+                  </p>
+                  {pendingOrder && phase === "idle" && (
+                    <div className="flex items-center gap-2 text-xs text-sky-600 dark:text-sky-400">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Đang chờ tiền về — tự động xác nhận trong ít phút...
+                    </div>
+                  )}
+                </div>
+              ) : cassoEnabled && !pendingOrder ? (
                 <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-muted/30 p-5 text-center">
                   <p className="text-sm text-muted-foreground">
                     {totalQty} suất · nhận trưa mai tại điểm tụ
@@ -501,7 +529,21 @@ export default function FoodPage() {
                 </div>
               )}
 
-              {cassoEnabled && !payosEnabled ? (
+              {payosEnabled ? (
+                <div className="mt-4">
+                  <TapButton
+                    onClick={() => {
+                      setShowPayment(false);
+                      setPendingOrder(null);
+                      setError(null);
+                    }}
+                    disabled={phase !== "idle"}
+                    className="w-full border border-border bg-muted/40 text-foreground shadow-none"
+                  >
+                    Đóng — đơn đã lưu, chờ tiền về
+                  </TapButton>
+                </div>
+              ) : cassoEnabled ? (
                 <div className="mt-4">
                   {!pendingOrder ? (
                     <TapButton
